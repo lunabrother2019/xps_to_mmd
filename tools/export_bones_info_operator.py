@@ -3,7 +3,7 @@ import json
 from bpy_extras.io_utils import ExportHelper
 
 class OBJECT_OT_export_selected_bones_info(bpy.types.Operator, ExportHelper):
-    bl_idname = "object.export_selected_bones_info"
+    bl_idname = "object.xps_export_selected_bones_info"
     bl_label = "导出所选骨骼信息"
     bl_description = "导出当前所选骨骼的位置、权重和父子关系"
     

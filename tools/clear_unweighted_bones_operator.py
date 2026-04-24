@@ -6,7 +6,7 @@ from ..bone_map_and_group import mmd_bone_map, mmd_bone_group
 
 class OBJECT_OT_clear_unweighted_bones(bpy.types.Operator):
     """清理没有权重的骨骼"""
-    bl_idname = "object.clear_unweighted_bones"
+    bl_idname = "object.xps_clear_unweighted_bones"
     bl_label = "Clear Unweighted Bones"
     
     def get_mmd_bone_whitelist(self):

@@ -1,5 +1,7 @@
 import bpy
 
+PREFIX = "xps_"
+
 _registered_props = []
 _current_updating_prop = None
 
@@ -29,6 +31,7 @@ def register_properties(properties_dict):
     global _registered_props
     for prop_name, prop_value in properties_dict.items():
         _registered_props.append(prop_name)
+        scene_attr = PREFIX + prop_name
         if prop_name in _finger_first_bones:
             def make_update_callback(p_name):
                 def callback(self, context):
@@ -39,7 +42,7 @@ def register_properties(properties_dict):
                     if obj and obj.type == 'ARMATURE':
                         auto_fill_finger_bones(context.scene, obj, p_name)
                 return callback
-            setattr(bpy.types.Scene, prop_name, bpy.props.StringProperty(default=prop_value, update=make_update_callback(prop_name)))
+            setattr(bpy.types.Scene, scene_attr, bpy.props.StringProperty(default=prop_value, update=make_update_callback(prop_name)))
         elif prop_name in _symmetric_bone_props:
             def make_symmetric_update_callback(p_name):
                 def callback(self, context):
@@ -50,16 +53,17 @@ def register_properties(properties_dict):
                     if obj and obj.type == 'ARMATURE':
                         try_fill_symmetric_bones(context.scene, obj, p_name, context.mode)
                 return callback
-            setattr(bpy.types.Scene, prop_name, bpy.props.StringProperty(default=prop_value, update=make_symmetric_update_callback(prop_name)))
+            setattr(bpy.types.Scene, scene_attr, bpy.props.StringProperty(default=prop_value, update=make_symmetric_update_callback(prop_name)))
         else:
-            setattr(bpy.types.Scene, prop_name, bpy.props.StringProperty(default=prop_value))
+            setattr(bpy.types.Scene, scene_attr, bpy.props.StringProperty(default=prop_value))
 
 
 def unregister_properties(properties_list):
     """使用属性名列表动态注销属性。"""
     for prop_name in properties_list:
-        if hasattr(bpy.types.Scene, prop_name):
-            delattr(bpy.types.Scene, prop_name)
+        scene_attr = PREFIX + prop_name
+        if hasattr(bpy.types.Scene, scene_attr):
+            delattr(bpy.types.Scene, scene_attr)
 
 
 def get_registered_props():

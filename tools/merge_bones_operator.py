@@ -116,7 +116,7 @@ class OBJECT_OT_merge_bones_base(bpy.types.Operator):
 
 class OBJECT_OT_merge_leg_bones(OBJECT_OT_merge_bones_base):
     """合并足部骨骼链"""
-    bl_idname = "object.merge_leg_bones"
+    bl_idname = "object.xps_merge_leg_bones"
     bl_label = "合并足部骨骼链"
     
     target_bones = ["左足", "右足", "左ひざ", "右ひざ"]
@@ -125,7 +125,7 @@ class OBJECT_OT_merge_leg_bones(OBJECT_OT_merge_bones_base):
 
 class OBJECT_OT_merge_arm_bones(OBJECT_OT_merge_bones_base):
     """合并手臂骨骼链"""
-    bl_idname = "object.merge_arm_bones"
+    bl_idname = "object.xps_merge_arm_bones"
     bl_label = "合并手臂骨骼链"
     
     target_bones = ["左腕", "右腕", "左ひじ", "右ひじ"]

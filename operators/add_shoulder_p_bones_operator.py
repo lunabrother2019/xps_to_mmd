@@ -5,7 +5,7 @@ from mathutils import Vector
 
 class OBJECT_OT_add_shoulder_p_bones(bpy.types.Operator):
     """添加MMD肩P骨骼"""
-    bl_idname = "object.add_shoulder_p_bones"
+    bl_idname = "object.xps_add_shoulder_p_bones"
     bl_label = "添加肩P骨骼"
     
     def execute(self, context):
@@ -207,7 +207,7 @@ class OBJECT_OT_add_shoulder_p_bones(bpy.types.Operator):
                     # 移除目标剪切
                     shadow_constraint.remove_target_shear = False
         # 对创建的骨骼进行分组
-        bpy.ops.object.create_bone_group()
+        bpy.ops.object.xps_create_bone_group()
         
         self.report({'INFO'}, f"已添加 {bones_added} 组肩P骨骼")
         return {'FINISHED'}

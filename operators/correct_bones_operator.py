@@ -3,7 +3,7 @@ import bpy
 
 class OBJECT_OT_correct_bones(bpy.types.Operator):
     """归正骨骼：创建备份、设置原点并取消动画，如果骨骼原点已在正确位置，则不需要点击"""
-    bl_idname = "object.correct_bones"
+    bl_idname = "object.xps_correct_bones"
     bl_label = "Correct Bones"
 
     def execute(self, context):
@@ -15,7 +15,7 @@ class OBJECT_OT_correct_bones(bpy.types.Operator):
         scene = context.scene
         
         # 获取上半身骨骼
-        upper_body_bone_name = getattr(scene, "upper_body_bone", None)
+        upper_body_bone_name = getattr(scene, "xps_upper_body_bone", None)
         if not upper_body_bone_name:
             self.report({'ERROR'}, "请先设置上半身骨骼")
             return {'CANCELLED'}

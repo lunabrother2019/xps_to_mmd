@@ -60,13 +60,13 @@ def register():
     properties.register_properties(bones)
 
     # 注册 EnumProperty
-    bpy.types.Scene.preset_enum = bpy.props.EnumProperty(
+    bpy.types.Scene.xps_preset_enum = bpy.props.EnumProperty(
         name="预设",
         description="选择一个预设",
         items=get_preset_enum,
         update=preset_enum_update  # 使用显式函数替代 lambda
     )
-    bpy.types.Scene.my_enum = bpy.props.EnumProperty(
+    bpy.types.Scene.xps_my_enum = bpy.props.EnumProperty(
         name="模式",
         description="选择操作模式",
         items=[
@@ -102,8 +102,8 @@ def unregister():
     properties.unregister_properties(bones)
 
     # 注销 EnumProperty
-    if hasattr(bpy.types.Scene, "preset_enum"):
-        delattr(bpy.types.Scene, "preset_enum")
+    if hasattr(bpy.types.Scene, "xps_preset_enum"):
+        delattr(bpy.types.Scene, "xps_preset_enum")
 
 # 新增 EnumProperty 定义
 def get_preset_enum(self, context):
@@ -122,7 +122,7 @@ def get_preset_enum(self, context):
 # 修改: 将 update 回调函数改为显式函数定义
 def preset_enum_update(self, context):
     # 调用加载预设的操作符
-    bpy.ops.object.load_preset(preset_name=self.preset_enum)
+    bpy.ops.object.xps_load_preset(preset_name=self.xps_preset_enum)
     return None  # 确保返回值为 None
 
 if __name__ == "__main__":

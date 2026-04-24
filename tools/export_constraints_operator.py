@@ -6,7 +6,7 @@ from bpy_extras.io_utils import ExportHelper
 
 class OBJECT_OT_export_selected_bones_constraints(bpy.types.Operator, ExportHelper):
     """导出所选骨骼约束关系"""
-    bl_idname = "object.export_selected_bones_constraints"
+    bl_idname = "object.xps_export_selected_bones_constraints"
     bl_label = "导出所选骨骼约束关系"
     bl_options = {'REGISTER', 'UNDO'}
     

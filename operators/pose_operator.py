@@ -5,7 +5,7 @@ from ..bone_utils import apply_armature_transforms
 # 新增的T-Pose到A-Pose转换操作符
 class OBJECT_OT_convert_to_apose(bpy.types.Operator):
     """将骨架转换为 A-Pose 并应用为新的静置姿态"""
-    bl_idname = "object.convert_to_apose" 
+    bl_idname = "object.xps_convert_to_apose" 
     bl_label = "Convert to A-Pose"
 
     def execute(self, context):
@@ -20,10 +20,10 @@ class OBJECT_OT_convert_to_apose(bpy.types.Operator):
         
         # 获取骨骼名称
         arm_bones = {
-            "left_upper_arm": getattr(scene, "left_upper_arm_bone", ""),
-            "right_upper_arm": getattr(scene, "right_upper_arm_bone", ""),
-            "left_lower_arm": getattr(scene, "left_lower_arm_bone", ""),
-            "right_lower_arm": getattr(scene, "right_lower_arm_bone", ""),          
+            "left_upper_arm": getattr(scene, "xps_left_upper_arm_bone", ""),
+            "right_upper_arm": getattr(scene, "xps_right_upper_arm_bone", ""),
+            "left_lower_arm": getattr(scene, "xps_left_lower_arm_bone", ""),
+            "right_lower_arm": getattr(scene, "xps_right_lower_arm_bone", ""),          
         }
 
         #1. 检查是否有设置骨骼

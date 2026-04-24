@@ -55,7 +55,7 @@ def add_damped_track_constraint(bone, target, subtarget, influence=0):
 # IK操作类
 class OBJECT_OT_add_ik(bpy.types.Operator):
     """为骨架添加MMD IK"""
-    bl_idname = "object.add_mmd_ik"
+    bl_idname = "object.xps_add_mmd_ik"
     bl_label = "Add MMD IK"
 
     def execute(self, context):

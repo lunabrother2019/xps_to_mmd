@@ -1,9 +1,10 @@
 import bpy
 import os
 import json
+from .properties import PREFIX
 
 class OBJECT_OT_load_preset(bpy.types.Operator):
-    bl_idname = "object.load_preset"
+    bl_idname = "object.xps_load_preset"
     bl_label = "Load Preset"
     
     preset_name: bpy.props.StringProperty()
@@ -18,8 +19,8 @@ class OBJECT_OT_load_preset(bpy.types.Operator):
                 preset_data = json.load(f)
                 
             for prop_name, bone_name in preset_data.items():
-                if hasattr(context.scene, prop_name):
-                    setattr(context.scene, prop_name, bone_name)
+                if hasattr(context.scene, PREFIX + prop_name):
+                    setattr(context.scene, PREFIX + prop_name, bone_name)
         
         return {'FINISHED'}
 
@@ -52,14 +53,14 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             sub_split = split_action.split(factor=(0.49*0.1), align=True)
             # 按钮部分
             sub_split.operator(
-                "object.fill_from_selection_specific",
+                "object.xps_fill_from_selection_specific",
                 text="",
                 icon='ZOOM_SELECTED'
             ).bone_property = prop_name
             # 选择框部分
             sub_split.prop_search(
                 scene,
-                prop_name,
+                PREFIX + prop_name,
                 obj.data,
                 "bones",
                 text=""
@@ -82,13 +83,13 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             # 在左侧操作部分进一步划分为 Button 和 Search Box
             sub_split_left_button = row_left_action.split(factor=0.1, align=True)
             sub_split_left_button.operator(
-                "object.fill_from_selection_specific",
+                "object.xps_fill_from_selection_specific",
                 text="",
                 icon='ZOOM_SELECTED'
             ).bone_property = left_prop  # 左侧按钮（Button）
             sub_split_left_button.prop_search(
                 scene,
-                left_prop,
+                PREFIX + left_prop,
                 obj.data,
                 "bones",
                 text=""  # 左侧选择框（Search Box）
@@ -106,13 +107,13 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             # 在右侧操作部分进一步划分为 Button 和 Search Box
             sub_split_right_button = row_right_action.split(factor=0.1, align=True)
             sub_split_right_button.operator(
-                "object.fill_from_selection_specific",
+                "object.xps_fill_from_selection_specific",
                 text="",
                 icon='ZOOM_SELECTED'
             ).bone_property = right_prop  # 右侧按钮（Button）
             sub_split_right_button.prop_search(
                 scene,
-                right_prop,
+                PREFIX + right_prop,
                 obj.data,
                 "bones",
                 text=""  # 右侧选择框（Search Box）
@@ -138,13 +139,13 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             # 在右侧操作部分进一步划分为 Button 和 Search Box
             sub_split_first_button = row_first_action.split(factor=0.1, align=True)
             sub_split_first_button.operator(
-                "object.fill_from_selection_specific",
+                "object.xps_fill_from_selection_specific",
                 text="",
                 icon='ZOOM_SELECTED'
             ).bone_property = first_prop  # 右側按钮（Button）
             sub_split_first_button.prop_search(
                 scene,
-                first_prop,
+                PREFIX + first_prop,
                 obj.data,
                 "bones",
                 text=""  # 右側选择框（Search Box）
@@ -159,13 +160,13 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             # 在右侧操作部分进一步划分为 Button 和 Search Box
             sub_split_second_button = row_second_bone.split(factor=0.1, align=True)
             sub_split_second_button.operator(
-                "object.fill_from_selection_specific",
+                "object.xps_fill_from_selection_specific",
                 text="",
                 icon='ZOOM_SELECTED'
             ).bone_property = second_prop  # 右側按钮（Button）
             sub_split_second_button.prop_search(
                 scene,
-                second_prop,
+                PREFIX + second_prop,
                 obj.data,
                 "bones",
                 text=""  # 右側选择框（Search Box）
@@ -181,25 +182,25 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             # 在右侧操作部分进一步划分为 Button 和 Search Box
             sub_split_third_button = row_third_bone.split(factor=0.1, align=True)
             sub_split_third_button.operator(
-                "object.fill_from_selection_specific",
+                "object.xps_fill_from_selection_specific",
                 text="",
                 icon='ZOOM_SELECTED'
             ).bone_property = third_prop  # 右側按钮（Button）
             sub_split_third_button.prop_search(
                 scene,
-                third_prop,
+                PREFIX + third_prop,
                 obj.data,
                 "bones",
                 text=""  # 右側选择框（Search Box）
             )
         # 添加选项卡按钮 - 移动到条件判断外部，使其始终可见
         row = layout.row()
-        row.prop(scene, "my_enum", expand=True)
-        if scene.my_enum == 'option1':
+        row.prop(scene, "xps_my_enum", expand=True)
+        if scene.xps_my_enum == 'option1':
 
             # 新增 EnumProperty 下拉菜单
             row = layout.row()
-            row.prop(scene, "preset_enum", text="")
+            row.prop(scene, "xps_preset_enum", text="")
         
             main_col = layout.column(align=True)
             # 全ての親到腰部分
@@ -249,59 +250,59 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
                 
             # 添加导入/导出预设按钮
             row = layout.row()
-            row.operator("object.import_preset", text="导入预设")
-            row.operator("object.export_preset", text="导出预设")
+            row.operator("object.xps_import_preset", text="导入预设")
+            row.operator("object.xps_export_preset", text="导出预设")
 
             row = layout.row()
             # 添加T-Pose到A-Pose转换按钮
-            row.operator("object.convert_to_apose", text="转换为A-Pose")
+            row.operator("object.xps_convert_to_apose", text="转换为A-Pose")
             # 添加第 0 步归正骨骼按钮
-            row.operator("object.correct_bones", text="归正骨架位置")
+            row.operator("object.xps_correct_bones", text="归正骨架位置")
             
             # 添加重命名按钮和补全缺失骨骼按钮到同一行
             row = layout.row()
-            row.operator("object.rename_to_mmd", text="1.重命名为MMD")
-            row.operator("object.complete_missing_bones", text="2.补全缺失骨骼")
+            row.operator("object.xps_rename_to_mmd", text="1.重命名为MMD")
+            row.operator("object.xps_complete_missing_bones", text="2.补全缺失骨骼")
 
             # 添加IK按钮和创建骨骼集合按钮到同一行
             row = layout.row()
-            row.operator("object.add_mmd_ik", text="3.添加MMD IK")
-            row.operator("object.create_bone_group", text="4.创建骨骼集合")
+            row.operator("object.xps_add_mmd_ik", text="3.添加MMD IK")
+            row.operator("object.xps_create_bone_group", text="4.创建骨骼集合")
 
             # 添加“使用mmdtools转换格式”按钮到最下方
-            layout.operator("object.use_mmd_tools_convert", text="5.使用mmdtools转换格式")
+            layout.operator("object.xps_use_mmd_tools_convert", text="5.使用mmdtools转换格式")
         # 其他工具选项卡
-        elif scene.my_enum == 'option2':
+        elif scene.xps_my_enum == 'option2':
             # 上部分：次标准骨骼
             secondary_bones_box = layout.box()
             secondary_bones_box.label(text="次标准骨骼", icon='BONE_DATA')
             
             # 添加合并足部骨骼链按钮
             row = secondary_bones_box.row()
-            row.operator("object.merge_leg_bones", text="1.合并足部骨骼链", icon='MOD_VERTEX_WEIGHT')
+            row.operator("object.xps_merge_leg_bones", text="1.合并足部骨骼链", icon='MOD_VERTEX_WEIGHT')
             # 添加腿部D骨骼按钮
             row = secondary_bones_box.row()
-            row.operator("object.add_leg_d_bones", text="2.添加腿部D骨骼", icon='BONE_DATA')
+            row.operator("object.xps_add_leg_d_bones", text="2.添加腿部D骨骼", icon='BONE_DATA')
             # 添加合并手臂骨骼链按钮
             row = secondary_bones_box.row()
-            row.operator("object.merge_arm_bones", text="1.合并手臂骨骼链", icon='MOD_VERTEX_WEIGHT')
+            row.operator("object.xps_merge_arm_bones", text="1.合并手臂骨骼链", icon='MOD_VERTEX_WEIGHT')
             #添加捩骨骼按钮
             row = secondary_bones_box.row()
-            row.operator("object.add_twist_bone", text="2.添加捩骨骼", icon='BONE_DATA')
+            row.operator("object.xps_add_twist_bone", text="2.添加捩骨骼", icon='BONE_DATA')
             #添加肩P骨骼按钮
             row = secondary_bones_box.row()
-            row.operator("object.add_shoulder_p_bones", text="3.添加肩P骨骼", icon='BONE_DATA')
+            row.operator("object.xps_add_shoulder_p_bones", text="3.添加肩P骨骼", icon='BONE_DATA')
             
             # 下部分：通用工具
             general_tools_box = layout.box()
             general_tools_box.label(text="通用工具", icon='TOOL_SETTINGS')
             
             row = general_tools_box.row()
-            row.operator("object.clear_unweighted_bones", text="清理无权重骨骼", icon='X')
+            row.operator("object.xps_clear_unweighted_bones", text="清理无权重骨骼", icon='X')
             # 添加导出骨骼信息按钮
             row = general_tools_box.row()
-            row.operator("object.export_selected_bones_info", text="导出所选骨骼信息", icon='EXPORT')
+            row.operator("object.xps_export_selected_bones_info", text="导出所选骨骼信息", icon='EXPORT')
             # 添加导出骨骼约束关系按钮
             row = general_tools_box.row()
-            row.operator("object.export_selected_bones_constraints", text="导出所选骨骼约束关系", icon='EXPORT')
+            row.operator("object.xps_export_selected_bones_constraints", text="导出所选骨骼约束关系", icon='EXPORT')
 

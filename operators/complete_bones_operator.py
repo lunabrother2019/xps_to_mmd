@@ -5,7 +5,7 @@ from .. import bone_utils
 
 class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
     """补充缺失的 MMD 格式骨骼"""
-    bl_idname = "object.complete_missing_bones"
+    bl_idname = "object.xps_complete_missing_bones"
     bl_label = "Complete Missing Bones"
 
     def connect_finger_bones(self, edit_bones):

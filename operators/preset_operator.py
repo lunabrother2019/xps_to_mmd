@@ -1,5 +1,6 @@
 import bpy
 import json
+from ..properties import PREFIX
 
 # 定义手指骨骼的属性列表
 _finger_bone_props = [
@@ -76,28 +77,28 @@ def auto_fill_finger_bones(scene, armature, first_prop):
     for fp, second_prop, third_prop in _finger_bone_props:
         if fp == first_prop:
             mode = bpy.context.mode
-            first_bone_value = getattr(scene, first_prop, "")
+            first_bone_value = getattr(scene, PREFIX + first_prop, "")
             
             if mode == 'EDIT_ARMATURE':
                 edit_bone = armature.data.edit_bones.get(first_bone_value)
                 if edit_bone and len(edit_bone.children) > 0:
                     second_bone = edit_bone.children[0].name
-                    setattr(scene, second_prop, second_bone)
+                    setattr(scene, PREFIX + second_prop, second_bone)
                     second_edit_bone = armature.data.edit_bones.get(second_bone)
                     if second_edit_bone and len(second_edit_bone.children) > 0:
                         third_bone = second_edit_bone.children[0].name
-                        setattr(scene, third_prop, third_bone)
+                        setattr(scene, PREFIX + third_prop, third_bone)
                         try_fill_symmetric_bones(scene, armature, first_prop, mode)
                         return True
             elif mode == 'POSE':
                 pose_bone = armature.pose.bones.get(first_bone_value)
                 if pose_bone and len(pose_bone.children) > 0:
                     second_bone = pose_bone.children[0].name
-                    setattr(scene, second_prop, second_bone)
+                    setattr(scene, PREFIX + second_prop, second_bone)
                     second_pose_bone = armature.pose.bones.get(second_bone)
                     if second_pose_bone and len(second_pose_bone.children) > 0:
                         third_bone = second_pose_bone.children[0].name
-                        setattr(scene, third_prop, third_bone)
+                        setattr(scene, PREFIX + third_prop, third_bone)
                         try_fill_symmetric_bones(scene, armature, first_prop, mode)
                         return True
             return False
@@ -110,10 +111,10 @@ def try_fill_symmetric_bones(scene, armature, first_prop, mode):
     if not symmetric_prop:
         return False
     
-    if getattr(scene, symmetric_prop, ""):
+    if getattr(scene, PREFIX + symmetric_prop, ""):
         return False
     
-    first_bone_value = getattr(scene, first_prop, "")
+    first_bone_value = getattr(scene, PREFIX + first_prop, "")
     if not first_bone_value:
         return False
     
@@ -138,7 +139,7 @@ def try_fill_symmetric_bones(scene, armature, first_prop, mode):
     if not symmetric_bone:
         return False
     
-    setattr(scene, symmetric_prop, symmetric_bone_name)
+    setattr(scene, PREFIX + symmetric_prop, symmetric_bone_name)
     
     if '_0' in first_prop or '_1' in first_prop or '_2' in first_prop:
         fill_symmetric_finger_chain(scene, armature, first_prop, symmetric_prop, symmetric_bone, mode)
@@ -158,26 +159,26 @@ def fill_symmetric_finger_chain(scene, armature, first_prop, symmetric_prop, sym
         symmetric_third_prop = symmetric_prop
     
     if symmetric_bone and len(symmetric_bone.children) > 0:
-        setattr(scene, symmetric_prop, symmetric_bone.name)
+        setattr(scene, PREFIX + symmetric_prop, symmetric_bone.name)
         
         symmetric_second_bone = symmetric_bone.children[0].name
-        setattr(scene, symmetric_second_prop, symmetric_second_bone)
+        setattr(scene, PREFIX + symmetric_second_prop, symmetric_second_bone)
         
         if mode == 'EDIT_ARMATURE':
             symmetric_second_edit_bone = armature.data.edit_bones.get(symmetric_second_bone)
             if symmetric_second_edit_bone and len(symmetric_second_edit_bone.children) > 0:
                 symmetric_third_bone = symmetric_second_edit_bone.children[0].name
-                setattr(scene, symmetric_third_prop, symmetric_third_bone)
+                setattr(scene, PREFIX + symmetric_third_prop, symmetric_third_bone)
         elif mode == 'POSE':
             symmetric_second_pose_bone = armature.pose.bones.get(symmetric_second_bone)
             if symmetric_second_pose_bone and len(symmetric_second_pose_bone.children) > 0:
                 symmetric_third_bone = symmetric_second_pose_bone.children[0].name
-                setattr(scene, symmetric_third_prop, symmetric_third_bone)
+                setattr(scene, PREFIX + symmetric_third_prop, symmetric_third_bone)
 
 
 class OBJECT_OT_fill_from_selection_specific(bpy.types.Operator):
     """从当前选定的骨骼填充特定的骨骼属性"""
-    bl_idname = "object.fill_from_selection_specific"
+    bl_idname = "object.xps_fill_from_selection_specific"
     bl_label = "Fill from Selection Specific"
     
     bone_property : bpy.props.StringProperty(name="Bone Property")# type: ignore
@@ -204,7 +205,7 @@ class OBJECT_OT_fill_from_selection_specific(bpy.types.Operator):
             return {'CANCELLED'}
 
         # 将第一个选定的骨骼填充到指定属性中
-        setattr(scene, self.bone_property, selected_bones[0])
+        setattr(scene, PREFIX + self.bone_property, selected_bones[0])
         current_bone_name = selected_bones[0]
         
         # 检查是否为左右对称骨骼属性，如果是则检测位置
@@ -227,7 +228,7 @@ class OBJECT_OT_fill_from_selection_specific(bpy.types.Operator):
         if auto_fill_finger_bones(scene, obj, self.bone_property):
             # 检查是否填充了对称侧
             symmetric_prop = _left_right_mapping.get(self.bone_property)
-            if symmetric_prop and getattr(scene, symmetric_prop, ""):
+            if symmetric_prop and getattr(scene, PREFIX + symmetric_prop, ""):
                 self.report({'INFO'}, f"已自动填充指骨链及其对称侧")
             else:
                 self.report({'INFO'}, f"已自动填充指骨链")
@@ -237,7 +238,7 @@ class OBJECT_OT_fill_from_selection_specific(bpy.types.Operator):
 
 class OBJECT_OT_export_preset(bpy.types.Operator):
     """导出当前骨骼配置为预设"""
-    bl_idname = "object.export_preset"
+    bl_idname = "object.xps_export_preset"
     bl_label = "Export Preset"
     filepath : bpy.props.StringProperty(subtype="FILE_PATH")# type: ignore
 
@@ -245,7 +246,7 @@ class OBJECT_OT_export_preset(bpy.types.Operator):
         scene = context.scene
         preset = {}
         for prop_name in get_bones_list():  # 确保 get_bones_list 在当前作用域中
-            preset[prop_name] = getattr(scene, prop_name, "")
+            preset[prop_name] = getattr(scene, PREFIX + prop_name, "")
 
         with open(self.filepath, 'w') as file:
             json.dump(preset, file, indent=4)
@@ -261,7 +262,7 @@ class OBJECT_OT_export_preset(bpy.types.Operator):
 
 class OBJECT_OT_import_preset(bpy.types.Operator):
     """导入骨骼配置预设"""
-    bl_idname = "object.import_preset"
+    bl_idname = "object.xps_import_preset"
     bl_label = "Import Preset"
     filepath : bpy.props.StringProperty(subtype="FILE_PATH")# type: ignore
 
@@ -276,7 +277,7 @@ class OBJECT_OT_import_preset(bpy.types.Operator):
 
         for prop_name, value in preset.items():
             if prop_name in get_bones_list():
-                setattr(scene, prop_name, value)
+                setattr(scene, PREFIX + prop_name, value)
 
         self.report({'INFO'}, f"已从 {self.filepath} 导入预设")
         return {'FINISHED'}
@@ -443,7 +444,7 @@ def get_bones_list():
 
 class OBJECT_OT_use_mmd_tools_convert(bpy.types.Operator):
     """调用mmdtools进行格式转换"""
-    bl_idname = "object.use_mmd_tools_convert"
+    bl_idname = "object.xps_use_mmd_tools_convert"
     bl_label = "Convert to MMD Model"
     bl_description = "使用mmd_tools插件转换模型格式（需要先安装mmd_tools插件）"
 

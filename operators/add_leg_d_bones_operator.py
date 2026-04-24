@@ -10,7 +10,7 @@ from ..bone_utils import create_or_update_bone
 
 class OBJECT_OT_add_leg_d_bones(bpy.types.Operator):
     """添加MMD腿部D骨骼"""
-    bl_idname = "object.add_leg_d_bones"
+    bl_idname = "object.xps_add_leg_d_bones"
     bl_label = "添加腿部D骨骼"
     
     def execute(self, context):
@@ -308,7 +308,7 @@ class OBJECT_OT_add_leg_d_bones(bpy.types.Operator):
         bpy.ops.object.mode_set(mode='OBJECT')
         
         # 对创建的骨骼进行分组
-        bpy.ops.object.create_bone_group()
+        bpy.ops.object.xps_create_bone_group()
         
         self.report({'INFO'}, f"已添加 {bones_added} 个腿部D骨骼")
         return {'FINISHED'}

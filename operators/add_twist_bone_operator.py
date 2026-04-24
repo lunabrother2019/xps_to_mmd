@@ -5,7 +5,7 @@ from mathutils import Vector
 
 class OBJECT_OT_add_twist_bone(bpy.types.Operator):
     """对腕部和手部骨骼进行捩骨骼设置"""
-    bl_idname = "object.add_twist_bone"
+    bl_idname = "object.xps_add_twist_bone"
     bl_label = "添加腕捩骨骼"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -170,7 +170,7 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
         #仅选择骨架对象
         bpy.context.view_layer.objects.active = obj
         # 对创建的骨骼进行分组，直接调用collection_operator中的操作符
-        bpy.ops.object.create_bone_group()
+        bpy.ops.object.xps_create_bone_group()
         self.report({'INFO'}, "成功拆分腕捩骨骼并设置权重和约束")
         return {'FINISHED'}
     def setup_constraints(self, obj):
