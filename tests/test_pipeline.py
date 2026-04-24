@@ -30,7 +30,7 @@ MODELS = {
     'inase': {
         'xps': '/Users/bytedance/Downloads/demo/inase (purifier)_lezisell-A/xps-b.xps',
         'target_pmx': '/Users/bytedance/Downloads/demo/Purifier Inase 18/Purifier Inase 18 None.pmx',
-        'preset': '3ds_max',
+        'preset': 'xna_lara_Inase',
     },
     'reika': {
         'xps': '/Users/bytedance/Downloads/demo/Reika/xps.xps',
