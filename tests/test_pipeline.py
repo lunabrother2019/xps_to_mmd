@@ -85,6 +85,15 @@ def _report():
         _write_report(out_dir, report)
         return
 
+    # Phase C — physics bake + tip delta (do BEFORE export to stay in Phase A scene)
+    try:
+        c = phase_c.bake_and_measure(frames=(1, 120))
+        report['phase_C'] = c
+        print(f"[phase C] hair={c.get('hair', {}).get('tip_delta_max_m')} breast={c.get('breast', {}).get('tip_delta_max_m')}")
+    except Exception as e:
+        traceback.print_exc()
+        report['phase_C_exception'] = str(e)
+
     # Phase B — round-trip
     try:
         arm = common.find_armature()
@@ -102,21 +111,7 @@ def _report():
         traceback.print_exc()
         report['phase_B_exception'] = str(e)
 
-    if TEST_PHASE in ('AB',):
-        _write_report(out_dir, report)
-        return
-
-    # Phase C — physics bake + tip delta
-    # Note: After Phase B we're in a fresh reimported scene, which is fine for physics bake
-    try:
-        c = phase_c.bake_and_measure(frames=(1, 120))
-        report['phase_C'] = c
-        print(f"[phase C] hair={c.get('hair', {}).get('tip_delta_max_m')} breast={c.get('breast', {}).get('tip_delta_max_m')}")
-    except Exception as e:
-        traceback.print_exc()
-        report['phase_C_exception'] = str(e)
-
-    if TEST_PHASE in ('ABC',):
+    if TEST_PHASE in ('AB', 'ABC'):
         _write_report(out_dir, report)
         return
 
