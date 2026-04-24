@@ -3,6 +3,85 @@ from mathutils import Vector
 from .. import bone_utils
 
 
+def _split_chain_weights(obj, src_name, dst_name, seg_from_name, seg_to_name,
+                         perp_threshold=1.5, src_keep_floor=0.0):
+    """PMXEditor 风格两骨沿段 t ∈ [0,1] 线性插值权重分配。
+
+    典型用法:
+      - ("上半身2", "上半身3", "上半身2", "首"):  转移模式 (src_keep_floor=0.0)
+    返回 (moved_verts, filtered_verts)。
+    """
+    src_keep_floor = max(0.0, min(1.0, src_keep_floor))
+    src_b = obj.data.bones.get(seg_from_name)
+    dst_b = obj.data.bones.get(seg_to_name)
+    if not src_b or not dst_b:
+        return (0, 0)
+    seg_from = src_b.head_local
+    seg_to = dst_b.head_local
+    seg = seg_to - seg_from
+    if seg.length_squared < 1e-9:
+        return (0, 0)
+    meshes = [
+        m for m in bpy.data.objects
+        if m.type == 'MESH' and any(
+            mod.type == 'ARMATURE' and mod.object == obj for mod in m.modifiers
+        )
+    ]
+    arm_mw = obj.matrix_world
+    seg_from_w = arm_mw @ seg_from
+    seg_to_w = arm_mw @ seg_to
+    seg_w = seg_to_w - seg_from_w
+    seg_len_sq_w = seg_w.length_squared
+    if seg_len_sq_w < 1e-9:
+        return (0, 0)
+    perp_limit_sq = (perp_threshold * perp_threshold) * seg_len_sq_w
+    moved = 0
+    filtered = 0
+    for m in meshes:
+        src_vg = m.vertex_groups.get(src_name)
+        if not src_vg:
+            continue
+        if dst_name not in m.vertex_groups:
+            m.vertex_groups.new(name=dst_name)
+        dst_vg = m.vertex_groups[dst_name]
+        mesh_mw = m.matrix_world
+        plans = []
+        for v in m.data.vertices:
+            src_w = 0.0
+            existing_dst = 0.0
+            for g in v.groups:
+                if g.group == src_vg.index:
+                    src_w = g.weight
+                elif g.group == dst_vg.index:
+                    existing_dst = g.weight
+            if src_w <= 0:
+                continue
+            v_w = mesh_mw @ v.co
+            rel = v_w - seg_from_w
+            t = rel.dot(seg_w) / seg_len_sq_w
+            t = max(0.0, min(1.0, t))
+            if t <= 0:
+                continue
+            perp_sq = rel.length_squared - t * t * seg_len_sq_w
+            if perp_sq > perp_limit_sq:
+                filtered += 1
+                continue
+            k = t
+            src_factor = 1.0 - k * (1.0 - src_keep_floor)
+            new_src = src_w * src_factor
+            new_dst = existing_dst + src_w * k
+            plans.append((v.index, new_src, new_dst))
+        for v_idx, new_src, new_dst in plans:
+            if new_src > 1e-6:
+                src_vg.add([v_idx], new_src, 'REPLACE')
+            else:
+                src_vg.remove([v_idx])
+            if new_dst > 1e-6:
+                dst_vg.add([v_idx], new_dst, 'REPLACE')
+            moved += 1
+    return (moved, filtered)
+
+
 class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
     """补充缺失的 MMD 格式骨骼"""
     bl_idname = "object.xps_complete_missing_bones"
@@ -195,10 +274,40 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
         # 检查上半身2骨骼是否存在，如果存在则添加到属性字典
         if edit_bones.get("上半身2"):
             bone_properties["上半身2"] = {
-                "head": Vector((0, edit_bones["上半身2"].head.y, edit_bones["上半身2"].head.z)), 
+                "head": Vector((0, edit_bones["上半身2"].head.y, edit_bones["上半身2"].head.z)),
                 "tail": Vector((0, edit_bones["首"].head.y, edit_bones["首"].head.z)),
                 "parent": "上半身", "use_connect": False
             }
+
+        # 上半身3 自动补全 (坑 1 + 坑 3 的 VMD 语义必需骨):
+        #   VMD 标准规格包含上半身3 keyframe，缺此骨 → 上半身僵硬。
+        #   target PMX 实测约 10900 verts 挂在上半身3，腋窝顶点几乎全部
+        #   同时挂 肩+腕+上半身3。
+        # 逻辑:
+        #   - 只在 上半身2 + 首 都存在，且上半身3 当前不存在时创建
+        #   - 上半身2.tail 改为 (上半身2.head → 首.head) 中点，让出位置
+        #   - 上半身3: head = 中点, tail = 首.head, parent = 上半身2
+        #   - 首.parent 从 上半身2 改为 上半身3
+        #   - 创建后进行权重沿段 t 线性迁移 (上半身2 → 上半身3)
+        upper3_just_created = False
+        if (edit_bones.get("上半身2") and edit_bones.get("首")
+                and not edit_bones.get("上半身3")):
+            upper2_head = bone_properties["上半身2"]["head"].copy()
+            neck_head = bone_properties["首"]["head"].copy()
+            spine_split_mid = (upper2_head + neck_head) * 0.5
+            # 只在 上半身2 和 首 间距足够时才拆（避免零长骨）
+            if (neck_head - upper2_head).length > bone_length * 0.2:
+                # 缩短上半身2 tail 到中点
+                bone_properties["上半身2"]["tail"] = spine_split_mid.copy()
+                # 插入 上半身3
+                bone_properties["上半身3"] = {
+                    "head": spine_split_mid.copy(),
+                    "tail": Vector((neck_head.x, neck_head.y, neck_head.z)),
+                    "parent": "上半身2", "use_connect": False, "use_deform": True,
+                }
+                # 首 parent 指向 上半身3
+                bone_properties["首"]["parent"] = "上半身3"
+                upper3_just_created = True
 
         # 按顺序检查并创建或更新骨骼
         for bone_name, properties in bone_properties.items():
@@ -221,10 +330,29 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
 
 
         # 调用函数设置 roll 値
-        bone_utils.set_roll_values(edit_bones, bone_utils.DEFAULT_ROLL_VALUES)               
+        bone_utils.set_roll_values(edit_bones, bone_utils.DEFAULT_ROLL_VALUES)
 
         # 连接手指骨骼的头尾
         self.connect_finger_bones(edit_bones)
+
+        # 上半身3 自动权重分割 (仅当本次自动创建时触发)
+        # 回到 OBJECT mode 才能改 vertex group
+        if upper3_just_created:
+            bpy.ops.object.mode_set(mode='OBJECT')
+            try:
+                moved, filtered = _split_chain_weights(
+                    obj, "上半身2", "上半身3", "上半身2", "首"
+                )
+                print(f"[xps_to_mmd complete_bones] 上半身3 auto-weight: "
+                      f"{moved} verts split from 上半身2, {filtered} filtered by perp")
+                self.report(
+                    {'INFO'},
+                    f"上半身3 已补齐，{moved} 顶点权重从 上半身2 分配过来",
+                )
+            except Exception as e:
+                print(f"[xps_to_mmd complete_bones] 上半身3 权重分割失败: {e}")
+                self.report({'WARNING'}, f"上半身3 权重分割失败: {e}")
+            bpy.ops.object.mode_set(mode='EDIT')
 
         return {'FINISHED'}
 

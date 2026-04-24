@@ -36,10 +36,14 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
         scene = context.scene
 
 
+        # Step 0: Import XPS (始终顶部可见)
+        row = layout.row()
+        row.operator("object.xps_import_xps", text="0. 导入 XPS", icon='IMPORT')
+
         # 检查活动对象是否为骨架
         obj = context.active_object
         if not obj or obj.type != 'ARMATURE':
-            layout.menu("TOPBAR_MT_file_import", text="Import", icon='IMPORT')
+            layout.menu("TOPBAR_MT_file_import", text="Other Import", icon='IMPORT')
             return
 
         # 添加带有标签、prop_search用于骨骼和填充按钮的行的函数
@@ -217,6 +221,7 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             col = upper_body_box.column()
             add_bone_row_with_button(col, "上半身*", "upper_body_bone")
             add_bone_row_with_button(col, "上半身2", "upper_body2_bone")
+            add_bone_row_with_button(col, "上半身3", "upper_body3_bone")
             add_bone_row_with_button(col, "首*", "neck_bone")
             add_bone_row_with_button(col, "頭*", "head_bone")
             add_symmetric_bones_with_buttons(col, "目", "left_eye_bone", "right_eye_bone")
@@ -293,10 +298,34 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             row = secondary_bones_box.row()
             row.operator("object.xps_add_shoulder_p_bones", text="3.添加肩P骨骼", icon='BONE_DATA')
             
+            # 物理：刚体 / 关节（先跑完主流水线第 5 步 + 必要 D 骨/捩骨再点）
+            physics_box = layout.box()
+            physics_box.label(text="物理 (先跑完主流水线第 5 步)", icon='PHYSICS')
+            row = physics_box.row()
+            row.operator("object.xps_generate_body_rigid_bodies", text="生成身体刚体", icon='MESH_CAPSULE')
+            row = physics_box.row()
+            row.operator("object.xps_generate_hair_physics", text="生成头发物理", icon='STRANDS')
+            row = physics_box.row()
+            row.operator("object.xps_generate_breast_physics", text="生成胸部物理", icon='META_BALL')
+
+            # XPS Lara 专属修正（按 L1→L3 诊断顺序，按需使用）
+            xps_fixes_box = layout.box()
+            xps_fixes_box.label(text="XPS 专属修正 (L1→L3 诊断顺序)", icon='MODIFIER')
+            xps_fixes_box.label(text="先查 L1 rest pose，再查 L2 约束，最后才动 L3 权重")
+            row = xps_fixes_box.row()
+            row.operator("object.xps_align_arms_to_canonical", text="L1: 对齐上臂")
+            row.operator("object.xps_align_fingers_to_canonical", text="L1: 对齐手指")
+            row = xps_fixes_box.row()
+            row.operator("object.xps_fix_forearm_bend", text="L1: 修正前腕弯曲")
+            row = xps_fixes_box.row()
+            row.operator("object.xps_snap_misaligned_bones", text="Snap 错位骨 (physics 前必跑)")
+            row = xps_fixes_box.row()
+            row.operator("object.xps_swap_twist_weights", text="L3: XPS 捩骨权重交换 (Lara 专属)")
+
             # 下部分：通用工具
             general_tools_box = layout.box()
             general_tools_box.label(text="通用工具", icon='TOOL_SETTINGS')
-            
+
             row = general_tools_box.row()
             row.operator("object.xps_clear_unweighted_bones", text="清理无权重骨骼", icon='X')
             # 添加导出骨骼信息按钮

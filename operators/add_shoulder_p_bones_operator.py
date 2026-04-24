@@ -31,12 +31,15 @@ class OBJECT_OT_add_shoulder_p_bones(bpy.types.Operator):
             bpy.ops.object.mode_set(mode='OBJECT')
             return {'CANCELLED'}
         
+        # 肩P 父级优先指向 上半身3 (存在时)，回落到 上半身2 以兼容未补齐 上半身3 的流程
+        spine_anchor = "上半身3" if edit_bones.get("上半身3") else "上半身2"
+
         # 定义肩部骨骼映射 (现有肩骨骼名, 肩P骨骼名, 肩C骨骼名, 肩P父级, 肩C父级, dummy父级, shadow父级)
         shoulder_bones_config = [
             # 右侧
-            ("右肩", "右肩P", "右肩C", "上半身2", "右肩", "右肩P", "上半身2"),
+            ("右肩", "右肩P", "右肩C", spine_anchor, "右肩", "右肩P", spine_anchor),
             # 左侧
-            ("左肩", "左肩P", "左肩C", "上半身2", "左肩", "左肩P", "上半身2"),
+            ("左肩", "左肩P", "左肩C", spine_anchor, "左肩", "左肩P", spine_anchor),
         ]
         
         bones_added = 0

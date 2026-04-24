@@ -24,6 +24,9 @@ from .operators import correct_bones_operator
 from .operators import add_leg_d_bones_operator
 from .operators import add_twist_bone_operator
 from .operators import add_shoulder_p_bones_operator
+from .operators import xps_import_operator
+from .operators import xps_fixes_operator
+from .operators import physics_operator
 from .tools import export_bones_info_operator
 from .tools import export_constraints_operator
 from .tools import merge_bones_operator
@@ -55,6 +58,10 @@ def register():
     bpy.utils.register_class(add_twist_bone_operator.OBJECT_OT_add_twist_bone)
     bpy.utils.register_class(add_shoulder_p_bones_operator.OBJECT_OT_add_shoulder_p_bones)
     bpy.utils.register_class(export_constraints_operator.OBJECT_OT_export_selected_bones_constraints)
+    # v1 新增 operator
+    xps_import_operator.register()
+    xps_fixes_operator.register()
+    physics_operator.register()
     # 注册动态属性
     bones = preset_operator.get_bones_list()
     properties.register_properties(bones)
@@ -97,6 +104,13 @@ def unregister():
     bpy.utils.unregister_class(add_twist_bone_operator.OBJECT_OT_add_twist_bone)
     bpy.utils.unregister_class(add_shoulder_p_bones_operator.OBJECT_OT_add_shoulder_p_bones)
     bpy.utils.unregister_class(export_constraints_operator.OBJECT_OT_export_selected_bones_constraints)
+    # v1 新增 operator
+    try:
+        physics_operator.unregister()
+        xps_fixes_operator.unregister()
+        xps_import_operator.unregister()
+    except Exception:
+        pass
     # 注销动态属性
     bones = preset_operator.get_bones_list()
     properties.unregister_properties(bones)
