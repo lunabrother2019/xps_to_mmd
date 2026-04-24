@@ -49,9 +49,17 @@ def reimport_and_check(pmx_path, expected_rb_body, expected_rb_hair, expected_rb
         if a is None or b is None or a not in rb_names or b not in rb_names:
             dangling.append({'joint': j.name, 'rigid_a': a, 'rigid_b': b})
 
-    # MMD core bones present
-    from .common import CORE_MMD_BONES
-    missing_core = [b for b in CORE_MMD_BONES if b not in arm.data.bones]
+    # MMD core bones present — accept both 左/右 prefix and .L/.R suffix
+    from .common import CORE_MMD_BONES_CORE, CORE_MMD_BONES_SYMMETRIC
+    missing_core = []
+    for b in CORE_MMD_BONES_CORE:
+        if b not in arm.data.bones:
+            missing_core.append(b)
+    for b in CORE_MMD_BONES_SYMMETRIC:
+        for side in ("L", "R"):
+            if (f"{b}.{side}" not in arm.data.bones
+                    and f"{'左' if side == 'L' else '右'}{b}" not in arm.data.bones):
+                missing_core.append(f"{b}.{side}")
 
     return {
         'status': 'ok' if not dangling and not missing_core else 'fail',

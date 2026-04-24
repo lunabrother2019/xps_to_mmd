@@ -54,7 +54,7 @@ PREFIX_JOINT_BREAST = "J.auto_rb_breast_"
 
 
 HAIR_KEYWORDS = ('hair', '髪', 'kami', 'ponytail', 'fringe', 'bang')
-BREAST_KEYWORDS = ('bust', 'breast', 'chest', '胸', '乳', 'oppai')
+BREAST_KEYWORDS = ('bust', 'breast', 'boob', 'chest', '胸', '乳', 'oppai')
 BREAST_PARENT_CANDIDATES = ('上半身2', '上半身', 'Chest', 'chest')  # valid parents
 
 
