@@ -407,9 +407,10 @@ class OBJECT_OT_generate_hair_physics(bpy.types.Operator):
                 radius = length * 0.4  # hair capsule radius
                 size = (radius, length, radius)
 
-                # gradient params: first node anchors (DYNAMIC_BONE)
+                # gradient params: first node anchors (STATIC — follows bone exactly,
+                # no physics response). DYNAMIC_BONE would still drift under gravity.
                 if i == 0:
-                    mode = MODE_DYNAMIC_BONE
+                    mode = MODE_STATIC
                     mass = 0.5
                     ang_damp = 0.999999
                     lin_damp = 0.5555
