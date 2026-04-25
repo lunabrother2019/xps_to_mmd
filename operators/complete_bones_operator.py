@@ -177,7 +177,7 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
             },
             "頭": {
                 "head": edit_bones["頭"].head,
-                "tail": Vector((0, edit_bones["頭"].head.y, edit_bones["頭"].head.z+bone_length * 0.25)),
+                "tail": Vector((0, edit_bones["頭"].head.y - bone_length * 0.3, edit_bones["頭"].head.z)),
                 "parent": "首",
                 "use_connect": False
             },                                  
