@@ -2,24 +2,17 @@
 
 ## 权重问题
 
-### [中] ひじ 权重 = 0
-- **日期**: 2026-04-25 发现
-- **现象**: 左ひじ/右ひじ VG 在 pipeline 结束后不存在，target 各有 1611 verts
-- **已尝试**: gradient split 改为 additive mode（不消费 ひじ 源权重），代码已提交但效果未体现
-- **根因推测**: ひじ VG 在 gradient split 之前就已被清空。可能在 mmd_convert (step 5) 或 D 骨 (step 6) 阶段被某步骤移除。需要在 pipeline 每步之间插入 checkpoint 确认 ひじ VG 状态
-- **排查方向**: 在 one_click_convert 的 step 5/6/7 之间加 debug print，确认 ひじ VG 在哪一步消失
+### [已解决] ~~ひじ 权重 = 0~~
+- **日期**: 2026-04-25 发现，2026-04-25 排查完成
+- **结论**: XPS 源模型 `arm left elbow` 骨在 body mesh 上**从导入开始就没有权重**（BEFORE pipeline: NONE）。前臂区域权重全在 foretwist/xtra07 等 helper 骨上。Target 的 ひじ=1611 是 Convert_to_MMD 额外创建的权重，非 XPS 复用。按"不切权重"原则不修。
 
-### [中] 足D 权重过少 (275 vs target 6567)
-- **日期**: 2026-04-25 发现
-- **现象**: D 骨 copy+clear 时 足 VG 本身就很少 verts，copy 后 D 骨权重不足
-- **根因**: VG rename (step 1) 成功把 `leg left thigh` → `左足`，但后续步骤消耗了 足 权重。Step 9 的 VG cleanup 在 D 骨 (step 6) 之后才跑，把旧名 VG 合回 足——此时 足 已经被 D 骨 copy 清空过了
-- **修复方向**: 把 VG cleanup 移到 D 骨之前，或者让 D 骨 operator 也检查旧名 VG
+### [已修复] ~~足D 权重过少 (275 → 581/871)~~
+- **日期**: 2026-04-25 发现，v1.6 修复
+- **修复**: VG cleanup 从 step 9 移到 step 5.5（D 骨之前），旧名 VG 先合入再 copy 到 D 骨
 
-### [低] 足 残留 306/596 verts (应为 0)
-- **日期**: 2026-04-25 发现
-- **现象**: D 骨 copy+clear 后 足 VG 应为 0，但 Step 9 VG cleanup 重新合入了旧名权重
-- **根因**: VG cleanup 跑在 D 骨之后，把 `leg left/right thigh` 合入已清空的 `左足/右足`
-- **修复方向**: 同上，调整 cleanup 时序
+### [已修复] ~~足 残留 306/596 → 0~~
+- **日期**: 2026-04-25 发现，v1.6 修复
+- **修复**: 同上，cleanup 时序调整后 D 骨 copy+clear 正确清零足 VG
 
 ## 骨骼结构
 
@@ -67,3 +60,7 @@
 | 2026-04-25 | v1.5 | D 骨 VG 用 rename 不用 copy | add_leg_d: 改为 copy+clear |
 | 2026-04-25 | v1.5 | 捩 _dummy_/_shadow_ use_deform=True | add_twist: 改 False |
 | 2026-04-25 | v1.5 | ひじ gradient split 消费源权重 | add_twist: ひじ→手首 改 additive |
+| 2026-04-25 | v1.6 | 首1 缺失 | complete_bones: 新建+split (1134 verts) |
+| 2026-04-25 | v1.6 | VG cleanup 在 D骨之后跑 | one_click: cleanup 移到 step 5.5 |
+| 2026-04-25 | v1.6 | 足 残留 306/596 + 足D 275 | 足D: 581/871, 足: 0/0 |
+| 2026-04-25 | v1.6 | ひじ=0 排查 | 确认 XPS 源模型特征，非 bug |
