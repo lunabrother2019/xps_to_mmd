@@ -250,6 +250,8 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             row.operator("object.xps_snap_misaligned_bones", text="Snap 错位骨 (physics 前必跑)")
             row = xps_fixes_box.row()
             row.operator("object.xps_swap_twist_weights", text="L3: XPS 捩骨权重交换 (Lara 专属)")
+            row = xps_fixes_box.row()
+            row.operator("object.xps_fix_bone_visibility", text="修正骨骼显示/隐藏", icon='HIDE_OFF')
 
             # 下部分：通用工具
             general_tools_box = layout.box()

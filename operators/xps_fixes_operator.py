@@ -850,6 +850,58 @@ class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
 _CLASSES = _CLASSES + (OBJECT_OT_transfer_unused_weights,)
 
 
+# ============================================================
+# 3g. Fix bone visibility to match MMD convention
+# ============================================================
+
+class OBJECT_OT_fix_bone_visibility(bpy.types.Operator):
+    """按 MMD 标准设置骨骼显示/隐藏（不影响权重和动画）"""
+    bl_idname = "object.xps_fix_bone_visibility"
+    bl_label = "修正骨骼显示"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    _SHOW = {'腕捩', '手捩', '目'}
+    _HIDE = {'肩C', '腕捩1', '腕捩2', '腕捩3', '手捩3'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'ARMATURE':
+            self.report({'ERROR'}, "请先选中骨架")
+            return {'CANCELLED'}
+
+        shown = []
+        hidden = []
+        for bone in obj.data.bones:
+            base = bone.name
+            for suffix in ('.L', '.R'):
+                if base.endswith(suffix):
+                    base = base[:-len(suffix)]
+                    break
+            for prefix in ('左', '右'):
+                if base.startswith(prefix):
+                    base = base[len(prefix):]
+                    break
+
+            if base in self._SHOW and bone.hide:
+                bone.hide = False
+                shown.append(bone.name)
+            elif base in self._HIDE and not bone.hide:
+                bone.hide = True
+                hidden.append(bone.name)
+
+        if shown:
+            print(f"[fix_visibility] 显示: {shown}")
+        if hidden:
+            print(f"[fix_visibility] 隐藏: {hidden}")
+
+        total = len(shown) + len(hidden)
+        self.report({'INFO'}, f"修正 {total} 骨显示状態" if total else "无需修正")
+        return {'FINISHED'}
+
+
+_CLASSES = _CLASSES + (OBJECT_OT_fix_bone_visibility,)
+
+
 def register():
     for cls in _CLASSES:
         bpy.utils.register_class(cls)
