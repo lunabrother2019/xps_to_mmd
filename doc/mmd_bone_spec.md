@@ -400,6 +400,43 @@ XPS 模型特有的辅助骨、保留原始権重不做任何処理。
 
 ---
 
+## 11. 骨骼显示/隐藏 (bone.hide)
+
+纯显示層設定、不影響権重・動画・変形。PMX 的 "骨可视" flag、mmd_tools 導入時映射到 `bone.hide`。
+
+### 規則
+
+**付与親 slave 骨 → 隐藏**（用户不直接操作、自动跟随主骨）
+**例外：D 骨 → 显示**（虽有付与親、但作为主要变形骨需要可见）
+
+判定条件：
+```python
+is_slave = mmd_bone.has_additional_rotation and mmd_bone.additional_transform_bone
+is_d_bone = base_name.endswith('D')  # 去掉 .L/.R 后缀
+should_hide = is_slave and not is_d_bone
+```
+
+### 各骨可视状態一覧
+
+| 骨骼 | hide | 理由 |
+|------|------|------|
+| 腕捩 | False | 主 twist 骨、VMD 驱動 |
+| 腕捩1/2/3 | **True** | 付与親 slave (→腕捩)、自動插値 |
+| 手捩 | False | 主 twist 骨、VMD 驱動 |
+| 手捩1/2/3 | **True** | 付与親 slave (→手捩)、自動插値 |
+| 肩C | **True** | 付与親 slave (→肩P)、自動生成 |
+| 肩P | False | VMD 驱動、獨立肩控制 |
+| 腰キャンセル | **True** | 付与親 slave (→腰、-1.0)、自動抵消 |
+| 足D/ひざD/足首D | False | 付与親有、但 D 骨是主要変形骨 |
+| 目 | False | 主変形骨 |
+| _dummy_/_shadow_ | **True** | 系統骨、use_deform=False |
+
+### 操作方法
+
+Panel → 次标准骨骼管理 → XPS 専属修正 → "修正骨骼显示/隐藏"
+
+---
+
 ## 快速検査表
 
 新建或排查骨骼時、按此表逐項驗証：
@@ -416,4 +453,5 @@ XPS 模型特有的辅助骨、保留原始権重不做任何処理。
 □ _shadow_ parent = 本骨 parent？ use_deform=False？ 有 COPY_TRANSFORMS → _dummy_？
 □ VG 権重正確？（D骨=copy主骨後清零, 控制骨=0, 指根=0, 肩P/肩C=0）
 □ apply_additional_transform 調用了？（肩C + 全 _dummy_/_shadow_ 自動生成）
+□ bone.hide 正確？（付与親 slave → hide=True、D 骨例外 → hide=False）
 ```
