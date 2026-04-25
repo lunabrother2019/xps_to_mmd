@@ -664,6 +664,7 @@ class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
         '左足', '右足', '左ひざ', '右ひざ', '左足首', '右足首', '左足先EX', '右足先EX',
         '左目', '右目', '腰キャンセル.L', '腰キャンセル.R',
         '左人指０', '右人指０', '左中指０', '右中指０', '左薬指０', '右薬指０', '左小指０', '右小指０',
+        'spine middle',
     ))
     PELVIS_TO_LOWER = True
 
