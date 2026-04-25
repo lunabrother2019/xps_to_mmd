@@ -734,18 +734,12 @@ class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
             self.report({'INFO'}, "无需转移的骨骼")
             return {'FINISHED'}
 
-        # 排除 mmd_bone.is_tip 骨 (如 腰キャンセル) — 它们是控制骨, 不接收权重
-        def _is_tip_bone(bone_name):
-            pb = obj.pose.bones.get(bone_name)
-            return bool(pb and getattr(pb, 'mmd_bone', None) and pb.mmd_bone.is_tip)
-
         valid_deform_bones = [
             b for b in obj.data.bones
             if not b.name.startswith('unused')
             and not b.name.startswith('_shadow')
             and not b.name.startswith('_dummy')
             and b.use_deform
-            and not _is_tip_bone(b.name)
         ]
         if not valid_deform_bones:
             self.report({'ERROR'}, "无有效变形骨")

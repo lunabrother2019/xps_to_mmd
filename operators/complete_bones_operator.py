@@ -240,14 +240,14 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 "tail": edit_bones["左足"].head + Vector((0, 0, bone_length * 0.5)),
                 "parent": "下半身",
                 "use_connect": False,
-                "use_deform": True
+                "use_deform": False
             },
             "腰キャンセル.R": {
                 "head": edit_bones["右足"].head.copy(),
                 "tail": edit_bones["右足"].head + Vector((0, 0, bone_length * 0.5)),
                 "parent": "下半身",
                 "use_connect": False,
-                "use_deform": True
+                "use_deform": False
             },
             "左足": {
                 "head": edit_bones["左足"].head,
