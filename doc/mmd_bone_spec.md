@@ -10,20 +10,28 @@
 
 ```
 全ての親 (root)
-  └─ センター (center)
-       └─ グルーブ (groove)
-            └─ 腰 (waist)
-                 ├─ 上半身 → 上半身2 → 上半身3 → 首 → 頭
-                 │    ├─ 左肩P → 左肩 → 左腕 → 左ひじ → 左手首 → fingers
-                 │    └─ 右肩P → 右肩 → 右腕 → 右ひじ → 右手首 → fingers
-                 └─ 下半身
-                      ├─ 腰キャンセル.L → 左足 → 左ひざ → 左足首 → 左足先EX
-                      └─ 腰キャンセル.R → 右足 → 右ひざ → 右足首 → 右足先EX
+  ├─ センター (center)
+  │    └─ グルーブ (groove)
+  │         └─ 腰 (waist)
+  │              ├─ 上半身 → 上半身1 → 上半身2 → 上半身3
+  │              │    ├─ 首 → 首1 → 頭
+  │              │    ├─ 左肩P → 左肩 → [左肩C] → 左腕 → 左腕捩 → 左ひじ → 左手捩 → 左手首
+  │              │    │                                                          ├─ 左人指０ → 左人指１~３
+  │              │    │                                                          ├─ 左中指０ → 左中指１~３
+  │              │    │                                                          ├─ 左薬指０ → 左薬指１~３
+  │              │    │                                                          ├─ 左小指０ → 左小指１~３
+  │              │    │                                                          └─ 左親指０~２
+  │              │    └─ (右側同構造)
+  │              └─ 下半身
+  │                   ├─ 腰キャンセル.L → 左足 → 左ひざ → 左足首 → 左足先EX
+  │                   │                  左足D → 左ひざD → 左足首D  (D骨、parent=腰キャンセル)
+  │                   └─ 腰キャンセル.R → (右側同構造)
   ├─ 左足IK親 → 左足ＩＫ → 左つま先ＩＫ
   └─ 右足IK親 → 右足ＩＫ → 右つま先ＩＫ
-```
 
-D 骨、捩骨、_dummy_、_shadow_ 在下方各节详述。
+[肩C] = apply_additional_transform 自動生成
+D骨、捩骨、_dummy_、_shadow_ 在下方各節詳述
+```
 
 ---
 
@@ -42,7 +50,7 @@ VMD 驱动旋转/位移，但**不直接影响 mesh 変形**。
 **要点**：
 - `use_deform=False` → 不出现在 valid_deform_bones 列表 → per-vertex-nearest 不会把权重分配到这些骨上
 - 如果有残留权重必须在 transfer_unused_weights 中清零
-- Target PMX (mmd_tools 导入) 会把这些设为 `use_deform=True`，但实际权重为 0，功能无区别
+- Target PMX (mmd_tools 导入) 会把这些设为 `use_deform=True`，但実際権重为 0，功能無区別
 
 ---
 
@@ -55,12 +63,13 @@ VMD 直接驱动，有 mesh 権重。
 | 上半身 | 腰 | True | 无 | 无 | 胴体上部 |
 | 上半身1 | 上半身 | True | 无 | 无 | 腹部（auto 从上半身 split） |
 | 上半身2 | 上半身1 | True | 无 | 无 | 胸部 |
-| 上半身3 | 上半身2 | True | 无 | 无 | 锁骨区域（auto 从上半身2 split） |
+| 上半身3 | 上半身2 | True | 无 | 无 | 鎖骨（auto 从上半身2 split） |
 | 下半身 | 腰 | True | 无 | 无 | 臀部/腰部 |
-| 首 | 上半身3 | True | 无 | 无 | 颈 |
-| 頭 | 首 | True | 无 | 无 | 头 |
-| 左肩/右肩 | 上半身3 | True | 无 | 无 | 肩 |
-| 左腕/右腕 | 左肩/右肩 | True | 无 | 无 | 上腕 |
+| 首 | 上半身3 | True | 无 | 无 | 頸 |
+| 首1 | 首 | True | 无 | 无 | 頸上部（auto 从首 split） |
+| 頭 | 首1 | True | 无 | 无 | 頭 |
+| 左肩/右肩 | 左肩P/右肩P | True | 无 | 无 | 肩 |
+| 左腕/右腕 | 左肩C/右肩C | True | 无 | 无 | 上腕（肩C 是 apply_additional_transform 自動生成） |
 | 左ひじ/右ひじ | 左腕/右腕 | True | 无 | 无 | 肘 |
 | 左手首/右手首 | 左ひじ/右ひじ | True | 无 | 无 | 手首 |
 | 左足/右足 | 腰キャンセル.L/.R | True | 无 | 无 | 大腿 |
@@ -68,28 +77,35 @@ VMD 直接驱动，有 mesh 権重。
 | 左足首/右足首 | 左ひざ/右ひざ | True | 无 | 无 | 足首 |
 | 左足先EX/右足先EX | 左足首/右足首 | True | 无 | 无 | 足先 |
 | 左目/右目 | 頭 | True | 无 | 无 | 眼睛 |
-| 左人指０/右人指０ | 手首 | True | 无 | 无 | 人差指根 (pass-through) |
-| 左中指０/右中指０ | 手首 | True | 无 | 无 | 中指根 (pass-through) |
-| 左薬指０/右薬指０ | 手首 | True | 无 | 无 | 薬指根 (pass-through) |
-| 左小指０/右小指０ | 手首 | True | 无 | 无 | 小指根 (pass-through) |
-| 親指０~２ ×2 | 手首/親指 | True | 无 | 无 | 親指 |
-| 指１~３ ×8 | 指根０ | True | 无 | 无 | 指骨 |
+
+### 指骨
+
+| 骨骼 | parent | use_deform | 権重 | 说明 |
+|------|--------|-----------|------|------|
+| 左親指０~２ | 手首→親指０→親指１ | True | XPS 原始 | 親指（XPS 有 3 段） |
+| 左人指０ | 手首 | True | **0** | 指根 pass-through |
+| 左人指１~３ | 人指０→１→２ | True | XPS 原始 | 人差指 |
+| 左中指０ | 手首 | True | **0** | 指根 pass-through |
+| 左中指１~３ | 中指０→１→２ | True | XPS 原始 | 中指 |
+| 左薬指０ | 手首 | True | **0** | 指根 pass-through |
+| 左薬指１~３ | 薬指０→１→２ | True | XPS 原始 | 薬指 |
+| 左小指０ | 手首 | True | **0** | 指根 pass-through |
+| 左小指１~３ | 小指０→１→２ | True | XPS 原始 | 小指 |
 
 **要点**：
-- D 骨创建后，足/ひざ/足首 の VG 権重应被 copy 到 D 骨，**原骨権重清零**
-- 上半身1 的权重由 `_split_chain_weights` 从上半身 split 得来（上半身 と 上半身2 の中点）
-- 上半身3 的权重由 `_split_chain_weights` 从上半身2 split 得来
-- 下半身 的权重包含 pelvis VG 直接映射（在 complete_bones 之前就建好 VG）
-- 首1 的权重由 `_split_chain_weights` 从首 split 得来
-- D 骨创建后，足/ひざ/足首 の VG 権重 copy 到 D 骨，**原骨清零**
-- 指根骨 (人指０ 等) 是 pass-through，位置 = midpoint(手首.head, 指１.head)，0 権重
-- 指１ の parent 从手首改为対応指根骨
+- 上半身1: `_split_chain_weights` 从上半身 split（上半身 と 上半身2 の中点）
+- 上半身3: `_split_chain_weights` 从上半身2 split
+- 首1: `_split_chain_weights` 从首 split（首 と 頭 の中点）
+- 下半身: pelvis VG 直接映射（在 complete_bones 之前就建好 VG）
+- D 骨创建後、足/ひざ/足首 の VG 権重 copy 到 D 骨、**原骨清零**
+- 指根骨 (人指０ 等) = pass-through、位置 = midpoint(手首.head, 指１.head)、0 権重
+- 指１ の parent 从手首改為対応指根骨
 
 ---
 
 ## 3. D 骨（準標準骨）
 
-**完全复制**对应主骨的旋转。VMD 不直接驱动 D 骨，通过 TRANSFORM constraint 从主骨同步。
+**完全複製**対応主骨的旋转。VMD 不直接驱動 D 骨、通过 TRANSFORM constraint 从主骨同期。
 
 | 骨骼 | parent | use_deform | 付与親 target | 付与親 influence |
 |------|--------|-----------|-------------|---------------|
@@ -108,62 +124,60 @@ owner_space:  LOCAL
 target_space: LOCAL
 map_from:     ROTATION
 map_to:       ROTATION
-mix_mode_rot: ADD          ← 必须是 ADD，不是 AFTER
+mix_mode_rot: ADD          ← 必須是 ADD、不是 AFTER
 from_rotation_mode: XYZ
 to_euler_order:     XYZ
 from_rot:     X/Y/Z = [-π, +π]
-to_rot:       X/Y/Z = [-π, +π]   (1:1 完全复制)
+to_rot:       X/Y/Z = [-π, +π]   (1:1 完全複製)
 ```
 
-**mix_mode_rot 为什么必须是 ADD**：
-- D 骨自身旋转通常为 0（VMD 不驱动）
-- ADD: `0 + 主骨旋转 = 主骨旋转`（纯加法，坐标系不变）
-- AFTER: 先算自身旋转(0°)再在结果空间叠加 → 自身旋转为 0 时和 ADD 一样，但有任何微小偏差时结果轴向会偏
-- MMD 标准就是 ADD
+**mix_mode_rot 為什麼必須是 ADD**：
+- D 骨自身旋转通常為 0（VMD 不驱動）
+- ADD: `0 + 主骨旋转 = 主骨旋转`（純加法、座標系不変）
+- AFTER: 先算自身旋转(0°)再在結果空間疊加 → 有任何微小偏差時結果軸向会偏
+- MMD 標準就是 ADD
 
 ### D 骨権重
 
-- D 骨 VG = 主骨 VG 的完整拷贝（copy，不是 move）
-- 创建 D 骨后，主骨（足/ひざ/足首）的 VG **应清零**
-- D 骨是实际控制 mesh 变形的骨，主骨只驱动旋转
+- D 骨 VG = 主骨 VG 的完整拷貝（copy、不是 move）
+- 創建 D 骨後、主骨（足/ひざ/足首）的 VG **清零**
+- D 骨是実際控制 mesh 変形的骨、主骨只驅動旋转
 
 ---
 
 ## 4. 腰キャンセル骨
 
-抵消腰旋转，让腿 IK 不受腰转影响。
+抵消腰旋转、讓腿 IK 不受腰転影響。
 
 | 骨骼 | parent | use_deform | 付与親 target | influence |
 |------|--------|-----------|-------------|-----------|
 | 腰キャンセル.L | 下半身 | **False** | 腰 | **-1.0** |
 | 腰キャンセル.R | 下半身 | **False** | 腰 | **-1.0** |
 
-### 约束
+### 約束
 
-Target reimport 后 mmd_tools 会展开为 TRANSFORM constraint：
+`apply_additional_transform` 後展開為 TRANSFORM constraint：
 
 ```
 type:         TRANSFORM
 subtarget:    _shadow_腰キャンセル.L
 mix_mode_rot: ADD
 influence:    1.0
-from/to_rot:  [-π, +π] → [+π, -π]   (注意反向！反转旋转)
+from/to_rot:  [-π, +π] → [+π, -π]   (注意反向！反転旋転)
 ```
 
-Auto 不需要显式 TRANSFORM（用 mmd_bone 属性代替，`apply_additional_transform` 后等价）。
-
 **要点**：
-- `use_deform=False` → 没有权重，不变形 mesh
-- 付与親 target 必须是 **腰**（grandparent），不是下半身（parent）
-  - 如果指向下半身 → mmd_tools reimport 时 _dummy_ 骨 parent=下半身 → 下半身大旋转叠加 → 腿 IK 抖动
-- head 位置 = 对应足.head（和足骨完全重合）
+- `use_deform=False` → 没有権重、不変形 mesh
+- 付与親 target 必須是 **腰**（grandparent）、不是下半身（parent）
+  - 如果指向下半身 → mmd_tools reimport 時 _dummy_ 骨 parent=下半身 → 下半身大旋転疊加 → 腿 IK 抖動
+- head 位置 = 対応足.head（和足骨完全重合）
 - 足/足D 的 parent 是腰キャンセル（不是下半身）
 
 ---
 
 ## 5. 肩P / 肩C 骨
 
-肩P 让肩有独立于上半身3 的控制。肩C 让肩跟随肩P 旋转。
+肩P 讓肩有獨立於上半身3 的控制。肩C 讓肩的 child chain 跟隨肩P 旋転。
 
 | 骨骼 | parent | use_deform | 権重 | constraint | 付与親 |
 |------|--------|-----------|------|-----------|-------|
@@ -173,34 +187,33 @@ Auto 不需要显式 TRANSFORM（用 mmd_bone 属性代替，`apply_additional_t
 **parent chain**:
 ```
 上半身3
-  └─ 肩P  (VMD 驱动, 独立控制肩旋转)
+  └─ 肩P  (VMD 驱動, 獨立控制肩旋転)
        └─ 肩  (主変形骨, 有権重)
-            └─ 肩C  (付与親→肩P, 让肩跟随肩P 旋转)
-                 └─ 腕  → ひじ → 手首
+            └─ 肩C  (付与親→肩P, 自動生成)
+                 └─ 腕 → 腕捩 → ひじ → 手捩 → 手首
 ```
 
 **要点**：
-- 肩P 和 肩C 都是 0 権重（肩承担変形）
-- 肩C 由 `apply_additional_transform` 自动创建，pipeline 中不需要手动创建
-- 肩C 的付与親 target=肩P，使肩的 child chain 跟随 肩P 旋转
+- 肩P 和 肩C 都是 0 権重（肩承擔変形）
+- 肩C 由 `apply_additional_transform` 自動創建、pipeline 中不需要手動創建
 - _dummy_肩C parent=肩P, _shadow_肩C parent=上半身3
 
 ### ダミー骨
 
-mmd_tools 创建的占位骨。
+mmd_tools 創建的占位骨（PMX reimport 時出現、pipeline 不需要創建）。
 
 | 骨骼 | parent | use_deform | 権重 | 说明 |
 |------|--------|-----------|------|------|
-| ダミー.L/.R | 手首 | True | 0 | 手首 placeholder，无实际功能 |
-| 操作中心 | None | True | 0 | UI 操作辅助骨 |
+| ダミー.L/.R | 手首 | True | 0 | 手首 placeholder |
+| 操作中心 | None | True | 0 | UI 操作辅助 |
 
 ---
 
-## 6. 捩骨（手腕扭转）
+## 6. 捩骨（手腕扭転）
 
-在上腕→肘→手首的区间内做 twist 插值。
+在上腕→肘→手首的区間内做 twist 插値。
 
-### 主捩骨（rename 自 XPS twist 候选骨）
+### 主捩骨（rename 自 XPS twist 候補骨）
 
 | 骨骼 | parent | use_deform | 付与親 | 说明 |
 |------|--------|-----------|-------|------|
@@ -230,105 +243,116 @@ to_rot:       X/Y/Z = [-angle, +angle]   (angle = 45° × index)
   捩1: ±45°, 捩2: ±90°, 捩3: ±135°
 ```
 
+### _dummy_ / _shadow_（捩サブ骨）
+
+| 骨骼 | parent | use_deform | constraint |
+|------|--------|-----------|-----------|
+| _dummy_左腕捩1~3 | 左腕捩 | **False** | 无 |
+| _dummy_左手捩1~3 | 左手捩 | **False** | 无 |
+| _shadow_左腕捩1~3 | 左腕 | **False** | COPY_TRANSFORMS → _dummy_ |
+| _shadow_左手捩1~3 | 左ひじ | **False** | COPY_TRANSFORMS → _dummy_ |
+
 **要点**：
-- 捩サブ骨 的 to_rot 不是 1:1，而是按 influence 缩放（0.25/0.50/0.75 对应 45°/90°/135°）
-- 捩主骨没有 TRANSFORM constraint，靠 parent chain 继承旋转
-- gradient split 将腕/ひじ 的权重按位置分配到捩サブ骨上
-- 源骨（腕/ひじ）保留按距离递减的权重（`retain = orig_w × (1-t)`）
+- 捩サブ骨 的 to_rot 不是 1:1、按 influence 縮放（0.25/0.50/0.75 対応 45°/90°/135°）
+- 捩主骨没有 TRANSFORM constraint、靠 parent chain 继承旋転
+- gradient split:
+  - 腕→ひじ: redistributive（腕 権重拆分到 腕捩サブ骨）
+  - ひじ→手首: **additive**（ひじ 権重保留、手捩サブ骨叠加）
+- _dummy_/_shadow_ 的 use_deform=**False**
 
 ---
 
 ## 付与親 (additional_transform) 系統
 
-MMD 的付与親是骨骼间旋转/位移联动的核心机制。一个骨骼设了付与親后，它的变换会自动跟随目标骨骼。
+MMD 的付与親是骨骼間旋転/位移聯動的核心機制。
 
-### PMX 层（mmd_bone 属性）
-
-在 Blender 里通过 `pose_bone.mmd_bone` 设定：
+### PMX 層（mmd_bone 属性）
 
 ```python
-pb.mmd_bone.has_additional_rotation = True    # 启用旋转联动
-pb.mmd_bone.has_additional_location = False   # 通常不需要位移联动
-pb.mmd_bone.additional_transform_bone = "目标骨名"  # 跟随谁
-# additional_transform_bone_id 是内部索引，自动管理
+pb.mmd_bone.has_additional_rotation = True    # 啟用旋転聯動
+pb.mmd_bone.has_additional_location = False   # 通常不需要位移聯動
+pb.mmd_bone.additional_transform_bone = "目標骨名"  # 跟隨誰
 ```
 
 ### Blender 実装（_dummy_ / _shadow_ / TRANSFORM 三件套）
 
-PMX 的付与親在 Blender 里无法直接实现，mmd_tools 通过三个辅助结构模拟：
+PMX 的付与親在 Blender 里無法直接実現、mmd_tools 通過三個辅助結構模擬：
 
 ```
-目標骨 (e.g. 左足) 旋转
+目標骨 (e.g. 左足) 旋転
   │
-  ├─ _dummy_左足D    ← parent=左足, 无 constraint
-  │   通过 parent chain 自动继承左足的旋转
+  ├─ _dummy_左足D    ← parent=左足, 無 constraint
+  │   通過 parent chain 自動繼承左足的旋転
   │
   ├─ _shadow_左足D   ← parent=腰キャンセル.L (=左足D 的 parent)
   │   COPY_TRANSFORMS ← _dummy_左足D
-  │   把 _dummy_ 的世界空間 transform 复制过来
+  │   把 _dummy_ 的世界空間 transform 複製過来
   │
   └─ 左足D           ← parent=腰キャンセル.L
       TRANSFORM ← _shadow_左足D (mix=ADD)
-      从 _shadow_ 读取旋转，ADD 到自身
+      从 _shadow_ 読取旋転、ADD 到自身
       → mesh 変形
 ```
 
-**为什么需要三件套而不直接读目標骨**：Blender 的 constraint 求值顺序问题。如果 D 骨直接读目標骨，
-在某些更新顺序下会延迟一帧。通过 _dummy_(parent chain) → _shadow_(COPY) → TRANSFORM 的中介链
-可以保证同帧同步。
+**為什麼需要三件套**：Blender 的 constraint 求値順序問題。直接讀目標骨可能延遲一幀。
+通過 _dummy_(parent chain) → _shadow_(COPY) → TRANSFORM 的中介鏈保証同幀同期。
 
-### 哪些骨用了付与親
+### 付与親一覧
 
 | 骨骼 | 付与親 target | influence | 说明 |
 |------|-------------|-----------|------|
-| 左足D/右足D | 左足/右足 | 1.0 (rot) | D 骨完全复制主骨旋转 |
-| 左ひざD/右ひざD | 左ひざ/右ひざ | 1.0 (rot) | 同上 |
-| 左足首D/右足首D | 左足首/右足首 | 1.0 (rot) | 同上 |
-| 腰キャンセル.L/.R | 腰 | **-1.0** (rot) | 反向抵消腰旋转 |
-| 左腕捩1~3 | 左腕捩 | 0.25/0.50/0.75 (rot) | 分段跟随 twist |
-| 左手捩1~3 | 左手捩 | 0.25/0.50/0.75 (rot) | 同上 |
+| 足D (×2) | 足 | 1.0 (rot) | D 骨完全複製 |
+| ひざD (×2) | ひざ | 1.0 (rot) | 同上 |
+| 足首D (×2) | 足首 | 1.0 (rot) | 同上 |
+| 腰キャンセル (×2) | 腰 | **-1.0** (rot) | 反向抵消 |
+| 肩C (×2) | 肩P | 1.0 (rot) | 肩連動（自動生成） |
+| 腕捩1~3 (×6) | 腕捩 | 0.25/0.50/0.75 | 分段 twist |
+| 手捩1~3 (×6) | 手捩 | 0.25/0.50/0.75 | 分段 twist |
 
 ### apply_additional_transform
 
-`bpy.ops.mmd_tools.apply_additional_transform()` 把 mmd_bone 属性展开为实际的 _dummy_/_shadow_/TRANSFORM constraint。
-Pipeline 里必须在所有骨骼创建完成后调用一次（one_click 的 step 8.5）。
+`bpy.ops.mmd_tools.apply_additional_transform()` 把 mmd_bone 属性展開為 _dummy_/_shadow_/TRANSFORM。
+Pipeline 里必須在所有骨骼創建完成後調用一次（one_click 的 step 8.5）。
 
-**不调用的后果**：mmd_bone 属性只是元数据，不会真正影响骨骼行为。D 骨不跟主骨旋转，腰キャンセル 不抵消腰旋转。
+**同時自動創建**：肩C 骨、所有 _dummy_/_shadow_ 骨。不需要手動創建。
+
+**不調用的後果**：mmd_bone 属性只是元数据、不会真正影響骨骼行為。
 
 ---
 
 ## 7. _dummy_ 骨
 
-付与親系统的 parent chain 中继。`_dummy_` 骨通过 parent=目標骨 来继承旋转。
+付与親系統的 parent chain 中繼。通過 parent=目標骨 来繼承旋転、無 constraint。
 
-| 骨骼 | parent | use_deform | constraint |
-|------|--------|-----------|-----------|
-| _dummy_左足D | 左足 | False | 无 |
-| _dummy_左ひざD | 左ひざ | False | 无 |
-| _dummy_左足首D | 左足首 | False | 无 |
-| _dummy_腰キャンセル.L | 腰 | False | 无 |
-| _dummy_左腕捩1 | 左腕捩 | False | 无 |
-| _dummy_左手捩1 | 左手捩 | False | 无 |
-| _dummy_左肩C | 左肩P | False | 无 |
+| 骨骼 | parent | use_deform |
+|------|--------|-----------|
+| _dummy_足D | 足 | False |
+| _dummy_ひざD | ひざ | False |
+| _dummy_足首D | 足首 | False |
+| _dummy_腰キャンセル | 腰 | False |
+| _dummy_肩C | 肩P | False |
+| _dummy_腕捩1~3 | 腕捩 | False |
+| _dummy_手捩1~3 | 手捩 | False |
 
-**parent 规则**：`_dummy_<X>` 的 parent = X 的付与親 target 骨。
-
-例如 `_dummy_左足D` parent=`左足`，因为 `左足D` 的付与親 target=`左足`。
-
-**没有 constraint**——_dummy_ 纯粹通过 parent chain 继承 target 骨的旋转。
+**parent 規則**：`_dummy_<X>` 的 parent = X 的付与親 target 骨。
 
 ---
 
 ## 8. _shadow_ 骨
 
-_shadow_ 骨是 _dummy_ 的"世界空间镜像"，通过 COPY_TRANSFORMS 从 _dummy_ 复制 transform，供 TRANSFORM constraint 读取。
+_dummy_ 的世界空間鏡像。COPY_TRANSFORMS 从 _dummy_ 複製 transform、供 TRANSFORM constraint 読取。
 
 | 骨骼 | parent | use_deform | constraint |
 |------|--------|-----------|-----------|
-| _shadow_左足D | 腰キャンセル.L | False | COPY_TRANSFORMS → _dummy_左足D |
-| _shadow_左ひざD | 左足 | False | COPY_TRANSFORMS → _dummy_左ひざD |
-| _shadow_左足首D | 左ひざ | False | COPY_TRANSFORMS → _dummy_左足首D |
-| _shadow_腰キャンセル.L | 腰 | False | COPY_TRANSFORMS → _dummy_腰キャンセル.L |
+| _shadow_足D | 腰キャンセル | False | COPY_TRANSFORMS → _dummy_足D |
+| _shadow_ひざD | 足 | False | COPY_TRANSFORMS → _dummy_ひざD |
+| _shadow_足首D | ひざ | False | COPY_TRANSFORMS → _dummy_足首D |
+| _shadow_腰キャンセル | 腰 | False | COPY_TRANSFORMS → _dummy_腰キャンセル |
+| _shadow_肩C | 上半身3 | False | COPY_TRANSFORMS → _dummy_肩C |
+| _shadow_腕捩1~3 | 腕 | False | COPY_TRANSFORMS → _dummy_腕捩N |
+| _shadow_手捩1~3 | ひじ | False | COPY_TRANSFORMS → _dummy_手捩N |
+
+**parent 規則**：`_shadow_<X>` 的 parent = X 的 parent 骨。
 
 ### COPY_TRANSFORMS constraint
 
@@ -341,23 +365,6 @@ owner_space:  POSE
 target_space: POSE
 ```
 
-**parent 规则**：`_shadow_<X>` 的 parent = X 的 parent 骨。
-
-例如 `_shadow_左足D` parent=`腰キャンセル.L`，因为 `左足D` 的 parent=`腰キャンセル.L`。
-
-### 信号链
-
-```
-主骨旋转 (e.g. 左足)
-   → _dummy_左足D (parent=左足, 继承旋转)
-      → COPY_TRANSFORMS → _shadow_左足D (复制 _dummy_ 的 transform)
-         → TRANSFORM constraint → 左足D (读取 _shadow_ 的旋转, mix=ADD)
-            → mesh 変形
-```
-
-**为什么不直接用主骨做 TRANSFORM source**：
-Blender 的 constraint 求值顺序问题。如果 D 骨直接读主骨，在某些更新顺序下会延迟一帧。通过 _dummy_/_shadow_ 中介可以保证同帧同步。
-
 ---
 
 ## 9. IK 骨
@@ -369,44 +376,44 @@ Blender 的 constraint 求值顺序问题。如果 D 骨直接读主骨，在某
 | 左つま先ＩＫ | 左足ＩＫ | False | IK (target=左足先EX) | 足先 IK |
 
 **要点**：
-- IK 骨 parent 在全ての親下面（独立于身体骨骼链），这样移動 IK handle 时不受身体旋转影响
-- use_deform=False，无権重
+- IK 骨 parent 在全ての親下面（獨立於身体骨骼鏈）
+- use_deform=False、無権重
 
 ---
 
 ## 10. XPS Helper 骨（PRESERVE）
 
-XPS 模型特有的辅助骨，保留原始权重不做任何处理。
+XPS 模型特有的辅助骨、保留原始権重不做任何処理。
 
-| 骨骼 (Inase) | parent | use_deform | 处理方式 |
+| 骨骼 (Inase) | parent | use_deform | 処理方式 |
 |-------------|--------|-----------|---------|
-| unused bip001 xtra04 | 左足 | True | PRESERVE（大腿内侧 helper） |
-| unused bip001 xtra02 | 右足 | True | PRESERVE（大腿内侧 helper） |
+| unused bip001 xtra04 | 左足 | True | PRESERVE（大腿内側 helper） |
+| unused bip001 xtra02 | 右足 | True | PRESERVE（大腿内側 helper） |
 | unused bip001 xtra08 | unused bip001 pelvis | True | PRESERVE（臀部 helper） |
 | unused bip001 xtra08opp | unused bip001 pelvis | True | PRESERVE（臀部 helper） |
-| unused bip001 pelvis | 下半身 | True | 権重 → 下半身 VG（直接映射，非 per-vertex-nearest） |
+| unused bip001 pelvis | 下半身 | True | 権重 → 下半身 VG（直接映射） |
 | boob left/right 1/2 | 上半身2 | True | PRESERVE（胸部 helper） |
 
 **要点**：
-- 不切权重原则：这些骨有独特轴向和 XPS 原始权重分布，合并会丢失矫正变形
-- pelvis 的 parent 必须是下半身（不是センター），否则 xtra08 不跟下半身旋转 → 臀部撕裂
+- 不切権重原則：這些骨有獨特軸向和 XPS 原始権重分布、合併会喪失矯正変形
+- pelvis 的 parent 必須是下半身（不是センター）、否則 xtra08 不跟下半身旋転 → 臀部撕裂
 
 ---
 
-## 快速检查表
+## 快速検査表
 
-新建或排查骨骼时，按此表逐项验证：
+新建或排查骨骼時、按此表逐項驗証：
 
 ```
-□ use_deform 正确？（控制骨=False, 変形骨=True）
-□ parent chain 正确？（参照层级图）
-□ 付与親 target 正确？（D骨→主骨, 腰キャンセル→腰）
+□ use_deform 正確？（控制骨/腰キャンセル/IK=False, 変形骨/D骨=True）
+□ parent chain 正確？（参照層級図）
+□ 付与親 target 正確？（D骨→主骨, 腰キャンセル→腰, 肩C→肩P）
 □ TRANSFORM constraint:
     □ mix_mode_rot = ADD？（不是 AFTER）
     □ subtarget = _shadow_<骨名>？
-    □ from/to rot 范围正确？（D骨=1:1, 捩サブ=缩放）
-□ _dummy_ parent = 付与親 target 骨？
-□ _shadow_ parent = 本骨 parent？
-□ _shadow_ 有 COPY_TRANSFORMS → _dummy_？
-□ VG 権重正确？（D骨创建后主骨清零, 控制骨=0）
+    □ from/to rot 範囲正確？（D骨=1:1, 捩サブ=縮放, 腰キャンセル=反向）
+□ _dummy_ parent = 付与親 target 骨？ use_deform=False？
+□ _shadow_ parent = 本骨 parent？ use_deform=False？ 有 COPY_TRANSFORMS → _dummy_？
+□ VG 権重正確？（D骨=copy主骨後清零, 控制骨=0, 指根=0, 肩P/肩C=0）
+□ apply_additional_transform 調用了？（肩C + 全 _dummy_/_shadow_ 自動生成）
 ```
