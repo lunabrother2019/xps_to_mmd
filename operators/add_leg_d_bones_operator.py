@@ -263,8 +263,7 @@ class OBJECT_OT_add_leg_d_bones(bpy.types.Operator):
                 transform_constraint.from_rotation_mode = 'XYZ'
                 # 设置映射模式为XYZ欧拉
                 transform_constraint.to_euler_order = 'XYZ'
-                # 设置混合选项为初始后
-                transform_constraint.mix_mode_rot = 'AFTER'
+                transform_constraint.mix_mode_rot = 'ADD'
                 
                 # 设置旋转范围（将角度转换为弧度）
                 transform_constraint.from_min_x_rot = math.radians(-180.0)

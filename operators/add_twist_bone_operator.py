@@ -442,7 +442,7 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                     tc.map_to = 'ROTATION'
                     tc.from_rotation_mode = 'XYZ'
                     tc.to_euler_order = 'XYZ'
-                    tc.mix_mode_rot = 'AFTER'
+                    tc.mix_mode_rot = 'ADD'
 
                     tc.from_min_x_rot = math.radians(-180.0)
                     tc.from_min_y_rot = math.radians(-180.0)
