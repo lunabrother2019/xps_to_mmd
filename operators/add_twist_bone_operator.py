@@ -153,6 +153,8 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                 })
 
         # 全局去重：一根骨可能同时落在上臂和前臂段
+        # 边界骨（t≈0 或 t≈1）优先分给 t≈0 的段（START 端），
+        # 因为 twist 主骨通常在段的起始端附近
         bone_plans = {}
         for idx, plan in enumerate(plans):
             for c in plan["candidates"]:
@@ -160,7 +162,13 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
         for bone_name, entries in bone_plans.items():
             if len(entries) <= 1:
                 continue
-            best_idx = max(entries, key=lambda e: min(e[1], 1.0 - e[1]))[0]
+            def _dedup_score(e):
+                t = e[1]
+                interior = min(t, 1.0 - t)
+                # 打平时优先 t 靠近 0 的段（bone 在段的 START 端）
+                start_bias = 1.0 - t if interior < 0.01 else 0
+                return (interior, start_bias)
+            best_idx = max(entries, key=_dedup_score)[0]
             for pi, _ in entries:
                 if pi != best_idx:
                     plans[pi]["candidates"] = [
