@@ -1,345 +1,380 @@
+"""
+上半身/前腕 twist 骨系统（位置识别，rename 优先，不切权重）。
+
+移植自 Convert_to_MMD_claude 的核心逻辑：
+1. 位置扫描找 XPS twist 候选骨（xtra07pp/foretwist 等）
+2. rename 候选到标准 MMD 槽位（VG 自动跟名字走，零损失）
+3. 无候选时创建空骨
+4. swap 腕↔腕捩 VG（xtra07pp 和腕位置重合，VG 覆盖区域互反）
+5. 不做任何破坏性权重分割
+"""
 import bpy
 import math
-from bpy.props import StringProperty
 from mathutils import Vector
 
+TWIST_SEGMENTS = [
+    # (seg_from_base, seg_to_base, main_base, sub_count, main_t, sub_ts)
+    ("腕", "ひじ", "腕捩", 3, 0.60, (0.25, 0.50, 0.75)),
+    ("ひじ", "手首", "手捩", 3, 0.60, (0.25, 0.50, 0.75)),
+]
+
+PERP_THRESHOLD_RATIO = 0.3
+T_RANGE = (-0.1, 1.2)
+
+
+def _closest_on_segment(point, seg_from, seg_to):
+    seg = seg_to - seg_from
+    L_sq = seg.length_squared
+    if L_sq < 1e-8:
+        return 0.0, (point - seg_from).length
+    t = (point - seg_from).dot(seg) / L_sq
+    t_clamped = max(0.0, min(1.0, t))
+    proj = seg_from + t_clamped * seg
+    return t, (point - proj).length
+
+
+def _vg_weight_count(mesh_obj, vg_name):
+    vg = mesh_obj.vertex_groups.get(vg_name)
+    if not vg:
+        return 0
+    return sum(1 for v in mesh_obj.data.vertices
+               for g in v.groups if g.group == vg.index and g.weight > 0.001)
+
+
+def _scan_candidates(armature, mesh_objects, seg_from_name, seg_to_name):
+    eb_from = armature.data.bones.get(seg_from_name)
+    eb_to = armature.data.bones.get(seg_to_name)
+    if not eb_from or not eb_to:
+        return []
+
+    mw = armature.matrix_world
+    sf = mw @ eb_from.head_local
+    st = mw @ eb_to.head_local
+    seg_len = (st - sf).length
+    if seg_len < 1e-5:
+        return []
+
+    # 排除 MMD 标准骨和手指骨
+    exclude = set()
+    seg_to_bone = armature.data.bones.get(seg_to_name)
+    if seg_to_bone:
+        for child in seg_to_bone.children_recursive:
+            exclude.add(child.name)
+        if seg_to_bone.parent:
+            for sibling in seg_to_bone.parent.children:
+                if sibling.name in (seg_to_name, seg_from_name):
+                    continue
+                if len(sibling.children) > 0:
+                    exclude.add(sibling.name)
+                    for child in sibling.children_recursive:
+                        exclude.add(child.name)
+
+    mmd_names = {seg_from_name, seg_to_name}
+    for base in ("腕捩", "手捩", "腕", "ひじ", "手首", "肩"):
+        for side in ("左", "右"):
+            mmd_names.add(side + base)
+            for i in (1, 2, 3):
+                mmd_names.add(f"{side}{base}{i}")
+
+    candidates = []
+    for bone in armature.data.bones:
+        name = bone.name
+        if name in exclude or name in mmd_names or name.startswith("_"):
+            continue
+        w_count = sum(_vg_weight_count(m, name) for m in mesh_objects)
+        if w_count <= 0:
+            continue
+        head_ws = mw @ bone.head_local
+        t_head, perp = _closest_on_segment(head_ws, sf, st)
+        if perp > seg_len * PERP_THRESHOLD_RATIO:
+            continue
+        if not (T_RANGE[0] <= t_head <= T_RANGE[1]):
+            continue
+        candidates.append((name, t_head, w_count))
+
+    return candidates
+
+
+def _assign_to_slots(candidates, sub_ts):
+    assignment = {}
+    if not candidates:
+        return assignment
+    sorted_c = sorted(candidates, key=lambda c: (-c[2], c[0]))
+    assignment[0] = sorted_c[0][0]
+    used = {0}
+    for c in sorted_c[1:]:
+        t_clamped = max(0.0, min(1.0, c[1]))
+        best_slot = None
+        best_dist = float("inf")
+        for i, st in enumerate(sub_ts, start=1):
+            if i in used:
+                continue
+            d = abs(t_clamped - st)
+            if d < best_dist:
+                best_dist = d
+                best_slot = i
+        if best_slot is not None:
+            assignment[best_slot] = c[0]
+            used.add(best_slot)
+    return assignment
+
+
 class OBJECT_OT_add_twist_bone(bpy.types.Operator):
-    """对腕部和手部骨骼进行捩骨骼设置"""
+    """位置识别 twist 系统：扫描 XPS 候选骨 rename 到 MMD 槽位，保留原始权重"""
     bl_idname = "object.xps_add_twist_bone"
     bl_label = "添加腕捩骨骼"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        # 获取当前选中的骨架对象
         obj = context.active_object
         if obj is None or obj.type != 'ARMATURE':
             self.report({'ERROR'}, "请先选择一个骨架对象")
             return {'CANCELLED'}
 
-        # 切换到编辑模式
+        mesh_objects = [
+            o for o in bpy.data.objects
+            if o.type == 'MESH' and (o.parent == obj or any(
+                m.type == 'ARMATURE' and m.object == obj for m in o.modifiers
+            ))
+        ]
+
+        # Phase 1: 在 OBJECT 模式扫描候选
+        plans = []
+        for seg_from_base, seg_to_base, main_base, sub_count, main_t, sub_ts in TWIST_SEGMENTS:
+            for side in ("左", "右"):
+                seg_from = side + seg_from_base
+                seg_to = side + seg_to_base
+                candidates = _scan_candidates(obj, mesh_objects, seg_from, seg_to)
+                plans.append({
+                    "seg_from": seg_from, "seg_to": seg_to,
+                    "main_base": main_base, "main_t": main_t,
+                    "sub_ts": sub_ts[:sub_count], "side": side,
+                    "candidates": candidates,
+                })
+
+        # 全局去重：一根骨可能同时落在上臂和前臂段
+        bone_plans = {}
+        for idx, plan in enumerate(plans):
+            for c in plan["candidates"]:
+                bone_plans.setdefault(c[0], []).append((idx, c[1]))
+        for bone_name, entries in bone_plans.items():
+            if len(entries) <= 1:
+                continue
+            best_idx = max(entries, key=lambda e: min(e[1], 1.0 - e[1]))[0]
+            for pi, _ in entries:
+                if pi != best_idx:
+                    plans[pi]["candidates"] = [
+                        c for c in plans[pi]["candidates"] if c[0] != bone_name
+                    ]
+
+        for plan in plans:
+            plan["assignment"] = _assign_to_slots(plan["candidates"], plan["sub_ts"])
+            for slot_idx, bone_name in plan["assignment"].items():
+                slot = plan["main_base"] if slot_idx == 0 else f"{plan['main_base']}{slot_idx}"
+                print(f"[twist] {plan['side']}{slot} <- {bone_name}")
+
+        # Phase 2: EDIT 模式创建/rename 骨骼
         bpy.ops.object.mode_set(mode='EDIT')
         edit_bones = obj.data.edit_bones
 
-        # 定义腕捩和手捩骨骼的名称
-        # 注意：根据JSON数据，需要创建单独的腕捩和手捩骨骼，以及三个细分的捩骨骼
-        twist_bones_def = [
-            # 左侧
-            ("左腕", ["左腕捩", "左腕捩1", "左腕捩2", "左腕捩3"]),
-            ("左ひじ", ["左手捩", "左手捩1", "左手捩2", "左手捩3"]),
-            # 右侧
-            ("右腕", ["右腕捩", "右腕捩1", "右腕捩2", "右腕捩3"]),
-            ("右ひじ", ["右手捩", "右手捩1", "右手捩2", "右手捩3"])
-        ]
-
-        for bone_name, twist_names in twist_bones_def:
-            if bone_name not in edit_bones:
+        renamed = []
+        for plan in plans:
+            seg_from_eb = edit_bones.get(plan["seg_from"])
+            seg_to_eb = edit_bones.get(plan["seg_to"])
+            if not seg_from_eb or not seg_to_eb:
                 continue
 
-            # 获取骨骼
-            base_bone = edit_bones[bone_name]
-            parent_bone = base_bone.parent
-            children_bones = [child for child in edit_bones if child.parent == base_bone]
+            side = plan["side"]
+            main_base = plan["main_base"]
+            seg_dir = seg_to_eb.head - seg_from_eb.head
+            seg_len = seg_dir.length
+            if seg_len < 1e-6:
+                continue
 
-            # 保存原骨骼的位置和方向
-            bone_head = base_bone.head
-            bone_tail = base_bone.tail
-            bone_vector = bone_tail - bone_head
-            bone_length = bone_vector.length
+            all_ts = [plan["main_t"]] + list(plan["sub_ts"])
+            slot_names = [side + main_base] + [f"{side}{main_base}{i}" for i in range(1, len(plan["sub_ts"]) + 1)]
 
-            # 创建捩骨骼
-            twist_bones = []
-            # 先创建所有捩骨骼
-            for i, twist_name in enumerate(twist_names):
-                # 创建新骨骼
-                twist_bone = edit_bones.new(twist_name)
-                
-                if i == 0:
-                    # 第一个骨骼是主要的捩骨骼（如左腕捩）
-                    # 位置在原骨骼的中间到尾部之间，参考JSON数据
-                    t = 0.6
-                    twist_head = bone_head + bone_vector * t
-                    twist_tail = bone_head + bone_vector * 1.0
-                    twist_bone.head = twist_head
-                    twist_bone.tail = twist_tail
+            children_of_base = [c for c in edit_bones if c.parent == seg_from_eb]
+
+            for slot_idx, (slot_name, t) in enumerate(zip(slot_names, all_ts)):
+                head = seg_from_eb.head + t * seg_dir
+                if slot_idx == 0:
+                    tail = seg_to_eb.head.copy()
                 else:
-                    # 后三个是细分的捩骨骼（如腕捩1.L、腕捩2.L、腕捩3.L）
-                    # 基于原骨骼的方向和长度计算位置，参考JSON数据
-                    t = (i) * 0.2  # 0.2, 0.4, 0.6
-                    twist_head = bone_head + bone_vector * t
-                    # 设置骨骼位置，方向向上（沿Z轴正方向）
-                    # 参考JSON数据，向上延伸约0.08单位
-                    twist_bone.head = twist_head
-                    twist_bone.tail = twist_head + Vector((0, 0, 0.08))
-                
-                # 设置骨骼方向
-                if i == 0:
-                    # 主要的捩骨骼（如左腕捩、左手捩）保持原始roll
-                    twist_bone.roll = base_bone.roll
-                else:
-                    # 只有1、2、3对应的捩骨骼需要设置扭转为0
-                    twist_bone.roll = 0.0
-                
-                # 设置为非相连项
-                twist_bone.use_connect = False
-                
-                twist_bones.append(twist_bone)
-            
-            # 然后创建shadow和dummy骨骼，放到捩2和3之间
-            for i, twist_bone in enumerate(twist_bones):
-                if i > 0:  # 跳过主要的捩骨骼（如左腕捩）
-                    # 计算捩2和3之间的位置，所有shadow和dummy骨骼都放在这里
-                    if len(twist_bones) > 3:
-                        # 计算捩2和捩3之间的中点
-                        twist2_head = twist_bones[2].head
-                        twist3_head = twist_bones[3].head
-                        shadow_head = (twist2_head + twist3_head) / 2
-                    else:
-                        # 如果没有捩3，就放在捩2的位置
-                        if len(twist_bones) > 2:
-                            shadow_head = twist_bones[2].head
-                        else:
-                            shadow_head = twist_bone.head
-                    
-                    # 创建shadow骨骼
-                    shadow_bone_name = f"_shadow_{twist_bone.name}"
-                    shadow_bone = edit_bones.new(shadow_bone_name)
-                    shadow_bone.head = shadow_head
-                    shadow_bone.tail = shadow_head + Vector((0, 0, 0.08))  # 尾部在头部上方
-                    shadow_bone.parent = base_bone
-                    shadow_bone.use_connect = False
-                    # 只有1、2、3对应的shadow骨骼需要设置扭转为0
-                    shadow_bone.roll = 0.0
-                    
-                    # 创建dummy骨骼，与shadow骨骼位置相同
-                    dummy_bone_name = f"_dummy_{twist_bone.name}"
-                    dummy_bone = edit_bones.new(dummy_bone_name)
-                    dummy_bone.head = shadow_bone.head  # 与shadow骨骼位置相同
-                    dummy_bone.tail = shadow_bone.tail  # 与shadow骨骼位置相同
-                    # 只有1、2、3对应的dummy骨骼需要设置扭转为0
-                    dummy_bone.roll = 0.0
-                    
-                    # 根据骨骼类型设置正确的父级
-                    if "腕捩" in twist_bone.name:
-                        # 查找腕捩骨骼作为dummy骨骼的父级
-                        main_twist_name = twist_bone.name.replace("1", "").replace("2", "").replace("3", "")
-                        if main_twist_name in edit_bones:
-                            dummy_bone.parent = edit_bones[main_twist_name]
-                        else:
-                            dummy_bone.parent = base_bone
-                    elif "手捩" in twist_bone.name:
-                        # 查找手捩骨骼作为dummy骨骼的父级
-                        main_twist_name = twist_bone.name.replace("1", "").replace("2", "").replace("3", "")
-                        if main_twist_name in edit_bones:
-                            dummy_bone.parent = edit_bones[main_twist_name]
-                        else:
-                            dummy_bone.parent = base_bone
-                    else:
-                        dummy_bone.parent = base_bone
-                    
-                    dummy_bone.use_connect = False
+                    tail = head + Vector((0, 0, 0.08))
 
-            # 设置骨骼层级，参考JSON数据
-            # 所有捩骨骼的父级都是原骨骼
-            for twist_bone in twist_bones:
-                twist_bone.parent = base_bone
-            
-            # 将原骨骼的子骨骼移到第一个捩骨骼下（如左腕捩）
-            # 这样可以保持与参考JSON数据一致的父子关系
-            if twist_bones:
-                for child in children_bones:
-                    # 保存子骨骼的原始位置
-                    original_head = child.head.copy()
-                    original_tail = child.tail.copy()
-                    
-                    # 移动父级
-                    child.parent = twist_bones[0]
-                    # 设置为非相连项
+                cand_name = plan["assignment"].get(slot_idx)
+                cand_eb = edit_bones.get(cand_name) if cand_name else None
+
+                if cand_eb:
+                    # rename 候选骨到标准名，VG 自动跟走
+                    cand_eb.use_connect = False
+                    cand_eb.parent = seg_from_eb
+                    cand_eb.head = head
+                    cand_eb.tail = tail
+                    cand_eb.use_deform = True
+                    if slot_idx == 0:
+                        cand_eb.roll = seg_from_eb.roll
+                    else:
+                        cand_eb.roll = 0.0
+                    cand_eb.name = slot_name
+                    renamed.append(f"{cand_name} -> {slot_name}")
+                else:
+                    # 无候选，创建空骨
+                    new_bone = edit_bones.new(slot_name)
+                    new_bone.head = head
+                    new_bone.tail = tail
+                    new_bone.parent = seg_from_eb
+                    new_bone.use_connect = False
+                    new_bone.use_deform = True
+                    if slot_idx == 0:
+                        new_bone.roll = seg_from_eb.roll
+                    else:
+                        new_bone.roll = 0.0
+
+            # 创建 shadow 和 dummy 骨（sub twist 用）
+            for i in range(1, len(plan["sub_ts"]) + 1):
+                sub_name = f"{side}{main_base}{i}"
+                sub_eb = edit_bones.get(sub_name)
+                if not sub_eb:
+                    continue
+                shadow_head = sub_eb.head.copy()
+                for prefix, parent_bone in [("_shadow_", seg_from_eb), ("_dummy_", edit_bones.get(side + main_base))]:
+                    aux_name = prefix + sub_name
+                    if aux_name not in edit_bones:
+                        aux = edit_bones.new(aux_name)
+                        aux.head = shadow_head
+                        aux.tail = shadow_head + Vector((0, 0, 0.08))
+                        aux.parent = parent_bone or seg_from_eb
+                        aux.use_connect = False
+                        aux.roll = 0.0
+
+            # reparent：子关节 → 主 twist
+            main_twist_eb = edit_bones.get(side + main_base)
+            if main_twist_eb:
+                for child in children_of_base:
+                    if child.name.startswith("_") or main_base in child.name:
+                        continue
+                    saved_head = child.head.copy()
+                    saved_tail = child.tail.copy()
+                    child.parent = main_twist_eb
                     child.use_connect = False
-                    
-                    # 恢复子骨骼的原始位置
-                    child.head = original_head
-                    child.tail = original_tail
+                    child.head = saved_head
+                    child.tail = saved_tail
 
-        # 添加约束
+        # Phase 3: POSE 模式设约束
         self.setup_constraints(obj)
 
-        # 不切权重：保留 XPS 原始权重，靠 parent-chain + additional_transform 继承变形
-        # 切换回对象模式
         bpy.ops.object.mode_set(mode='OBJECT')
-        #仅选择骨架对象
+
+        # Phase 4: VG swap（腕 ↔ 腕捩）
+        # xtra07pp rename 成腕捩后，其 VG 覆盖上臂区域（像 target 的腕 VG）
+        # 原腕 VG 覆盖 twist 区域（像 target 的腕捩 VG）
+        # 交换两者纠正覆盖区域
+        for base_twist, base_arm in [("腕捩", "腕")]:
+            for side in ("左", "右"):
+                twist_name = side + base_twist
+                arm_name = side + base_arm
+                if not any(f"-> {twist_name}" in r for r in renamed):
+                    continue
+                for mesh in mesh_objects:
+                    vg_arm = mesh.vertex_groups.get(arm_name)
+                    vg_twist = mesh.vertex_groups.get(twist_name)
+                    if not vg_arm and not vg_twist:
+                        continue
+                    tmp = f"__swap_tmp_{side}"
+                    if vg_arm:
+                        vg_arm.name = tmp
+                    if vg_twist:
+                        vg_twist.name = arm_name
+                    if vg_arm:
+                        vg_arm.name = twist_name
+                print(f"[twist] Swap VG: {arm_name} <-> {twist_name}")
+
         bpy.context.view_layer.objects.active = obj
-        # 对创建的骨骼进行分组，直接调用collection_operator中的操作符
         bpy.ops.object.xps_create_bone_group()
-        self.report({'INFO'}, "成功拆分腕捩骨骼并设置权重和约束")
+
+        n_renamed = len(renamed)
+        for r in renamed:
+            print(f"[twist] Renamed: {r}")
+        self.report({'INFO'}, f"成功拆分腕捩骨骼（renamed {n_renamed}，不切权重）")
         return {'FINISHED'}
+
     def setup_constraints(self, obj):
         """为腕捩和手捩骨骼添加约束"""
-        # 切换到姿态模式
         bpy.ops.object.mode_set(mode='POSE')
-        
         pose_bones = obj.pose.bones
-        
-        # 锁定腕捩和手捩骨骼的移动以及X和Z轴的旋转
+
         for bone in pose_bones:
             if "腕捩" in bone.name or "手捩" in bone.name:
-                # 锁定移动
                 bone.lock_location[0] = True
                 bone.lock_location[1] = True
                 bone.lock_location[2] = True
-                # 锁定X和Z轴的旋转，只允许Y轴旋转
                 bone.lock_rotation[0] = True
                 bone.lock_rotation[1] = False
                 bone.lock_rotation[2] = True
-        
-        # 为腕捩骨骼添加约束
+
         for side in ['左', '右']:
-            # 腕捩骨骼约束
-            for i in range(1, 4):  # 腕捩1, 腕捩2, 腕捩3
-                twist_bone_name = f"{side}腕捩{i}"
-                if twist_bone_name in pose_bones:
+            for twist_type in ['腕捩', '手捩']:
+                for i in range(1, 4):
+                    twist_bone_name = f"{side}{twist_type}{i}"
+                    if twist_bone_name not in pose_bones:
+                        continue
                     twist_bone = pose_bones[twist_bone_name]
-                    
-                    # 清除现有约束
-                    for constraint in twist_bone.constraints:
+
+                    for constraint in list(twist_bone.constraints):
                         twist_bone.constraints.remove(constraint)
-                    
-                    # 添加TRANSFORM约束
-                    transform_constraint = twist_bone.constraints.new('TRANSFORM')
-                    transform_constraint.name = "mmd_additional_rotation"
-                    transform_constraint.target = obj
-                    transform_constraint.subtarget = f"_shadow_{side}腕捩{i}"
-                    transform_constraint.influence = 1.0
-                    transform_constraint.use_motion_extrapolate = True
-                    # 设置所有者空间为局部空间
-                    transform_constraint.owner_space = 'LOCAL'
-                    # 设置目标空间为局部空间
-                    transform_constraint.target_space = 'LOCAL'
-                    # 设置从旋转映射到旋转
-                    transform_constraint.map_from = 'ROTATION'
-                    transform_constraint.map_to = 'ROTATION'
-                    # 设置映射自的模式为XYZ欧拉
-                    transform_constraint.from_rotation_mode = 'XYZ'
-                    # 设置映射模式为XYZ欧拉
-                    transform_constraint.to_euler_order = 'XYZ'
-                    # 设置混合选项为初始后
-                    transform_constraint.mix_mode_rot = 'AFTER'
-                    
-                    # 设置旋转范围（将角度转换为弧度）
-                    transform_constraint.from_min_x_rot = math.radians(-180.0)
-                    transform_constraint.from_min_y_rot = math.radians(-180.0)
-                    transform_constraint.from_min_z_rot = math.radians(-180.0)
-                    transform_constraint.from_max_x_rot = math.radians(180.0)
-                    transform_constraint.from_max_y_rot = math.radians(180.0)
-                    transform_constraint.from_max_z_rot = math.radians(180.0)
-                    
-                    # 根据骨骼索引设置不同的旋转限制（将角度转换为弧度）
+
+                    tc = twist_bone.constraints.new('TRANSFORM')
+                    tc.name = "mmd_additional_rotation"
+                    tc.target = obj
+                    tc.subtarget = f"_shadow_{twist_bone_name}"
+                    tc.influence = 1.0
+                    tc.use_motion_extrapolate = True
+                    tc.owner_space = 'LOCAL'
+                    tc.target_space = 'LOCAL'
+                    tc.map_from = 'ROTATION'
+                    tc.map_to = 'ROTATION'
+                    tc.from_rotation_mode = 'XYZ'
+                    tc.to_euler_order = 'XYZ'
+                    tc.mix_mode_rot = 'AFTER'
+
+                    tc.from_min_x_rot = math.radians(-180.0)
+                    tc.from_min_y_rot = math.radians(-180.0)
+                    tc.from_min_z_rot = math.radians(-180.0)
+                    tc.from_max_x_rot = math.radians(180.0)
+                    tc.from_max_y_rot = math.radians(180.0)
+                    tc.from_max_z_rot = math.radians(180.0)
+
                     influence_map = {1: 0.25, 2: 0.5, 3: 0.75}
                     angle = 45.0 * i
-                    transform_constraint.to_min_x_rot = math.radians(-angle)
-                    transform_constraint.to_min_y_rot = math.radians(-angle)
-                    transform_constraint.to_min_z_rot = math.radians(-angle)
-                    transform_constraint.to_max_x_rot = math.radians(angle)
-                    transform_constraint.to_max_y_rot = math.radians(angle)
-                    transform_constraint.to_max_z_rot = math.radians(angle)
+                    tc.to_min_x_rot = math.radians(-angle)
+                    tc.to_min_y_rot = math.radians(-angle)
+                    tc.to_min_z_rot = math.radians(-angle)
+                    tc.to_max_x_rot = math.radians(angle)
+                    tc.to_max_y_rot = math.radians(angle)
+                    tc.to_max_z_rot = math.radians(angle)
 
                     twist_bone.mmd_bone.has_additional_rotation = True
-                    twist_bone.mmd_bone.additional_transform_bone = f"{side}腕捩"
+                    twist_bone.mmd_bone.additional_transform_bone = f"{side}{twist_type}"
                     twist_bone.mmd_bone.additional_transform_influence = influence_map[i]
 
-            # 为手捩骨骼添加约束
-            for i in range(1, 4):  # 手捩1, 手捩2, 手捩3
-                twist_bone_name = f"{side}手捩{i}"
-                if twist_bone_name in pose_bones:
-                    twist_bone = pose_bones[twist_bone_name]
-                    
-                    # 清除现有约束
-                    for constraint in twist_bone.constraints:
-                        twist_bone.constraints.remove(constraint)
-                    
-                    # 添加TRANSFORM约束
-                    transform_constraint = twist_bone.constraints.new('TRANSFORM')
-                    transform_constraint.name = "mmd_additional_rotation"
-                    transform_constraint.target = obj
-                    transform_constraint.subtarget = f"_shadow_{side}手捩{i}"
-                    transform_constraint.influence = 1.0
-                    transform_constraint.use_motion_extrapolate = True
-                    # 设置所有者空间为局部空间
-                    transform_constraint.owner_space = 'LOCAL'
-                    # 设置目标空间为局部空间
-                    transform_constraint.target_space = 'LOCAL'
-                    # 设置从旋转映射到旋转
-                    transform_constraint.map_from = 'ROTATION'
-                    transform_constraint.map_to = 'ROTATION'
-                    # 设置映射自的模式为XYZ欧拉
-                    transform_constraint.from_rotation_mode = 'XYZ'
-                    # 设置映射模式为XYZ欧拉
-                    transform_constraint.to_euler_order = 'XYZ'
-                    # 设置混合选项为初始后
-                    transform_constraint.mix_mode_rot = 'AFTER'
-                    
-                    # 设置旋转范围（将角度转换为弧度）
-                    transform_constraint.from_min_x_rot = math.radians(-180.0)
-                    transform_constraint.from_min_y_rot = math.radians(-180.0)
-                    transform_constraint.from_min_z_rot = math.radians(-180.0)
-                    transform_constraint.from_max_x_rot = math.radians(180.0)
-                    transform_constraint.from_max_y_rot = math.radians(180.0)
-                    transform_constraint.from_max_z_rot = math.radians(180.0)
-                    
-                    # 根据骨骼索引设置不同的旋转限制（将角度转换为弧度）
-                    influence_map = {1: 0.25, 2: 0.5, 3: 0.75}
-                    angle = 45.0 * i
-                    transform_constraint.to_min_x_rot = math.radians(-angle)
-                    transform_constraint.to_min_y_rot = math.radians(-angle)
-                    transform_constraint.to_min_z_rot = math.radians(-angle)
-                    transform_constraint.to_max_x_rot = math.radians(angle)
-                    transform_constraint.to_max_y_rot = math.radians(angle)
-                    transform_constraint.to_max_z_rot = math.radians(angle)
-
-                    twist_bone.mmd_bone.has_additional_rotation = True
-                    twist_bone.mmd_bone.additional_transform_bone = f"{side}手捩"
-                    twist_bone.mmd_bone.additional_transform_influence = influence_map[i]
-
-        # 为shadow骨骼添加COPY_TRANSFORMS约束
-        for side in ['左', '右']:
-            # 腕捩shadow骨骼
-            for i in range(1, 4):
-                shadow_bone_name = f"_shadow_{side}腕捩{i}"
-                if shadow_bone_name in pose_bones:
-                    shadow_bone = pose_bones[shadow_bone_name]
-                    
-                    # 清除现有约束
-                    for constraint in shadow_bone.constraints:
-                        shadow_bone.constraints.remove(constraint)
-                    
-                    # 添加COPY_TRANSFORMS约束
-                    copy_constraint = shadow_bone.constraints.new('COPY_TRANSFORMS')
-                    copy_constraint.name = "mmd_tools_at_dummy"
-                    copy_constraint.target = obj
-                    copy_constraint.subtarget = f"_dummy_{side}腕捩{i}"
-                    copy_constraint.influence = 1.0
-                    # 设置为姿态空间
-                    copy_constraint.owner_space = 'POSE'
-                    copy_constraint.target_space = 'POSE'
-            
-            # 手捩shadow骨骼
-            for i in range(1, 4):
-                shadow_bone_name = f"_shadow_{side}手捩{i}"
-                if shadow_bone_name in pose_bones:
-                    shadow_bone = pose_bones[shadow_bone_name]
-                    
-                    # 清除现有约束
-                    for constraint in shadow_bone.constraints:
-                        shadow_bone.constraints.remove(constraint)
-                    
-                    # 添加COPY_TRANSFORMS约束
-                    copy_constraint = shadow_bone.constraints.new('COPY_TRANSFORMS')
-                    copy_constraint.name = "mmd_tools_at_dummy"
-                    copy_constraint.target = obj
-                    copy_constraint.subtarget = f"_dummy_{side}手捩{i}"
-                    copy_constraint.influence = 1.0
-                    # 设置为姿态空间
-                    copy_constraint.owner_space = 'POSE'
-                    copy_constraint.target_space = 'POSE'
+            # shadow 骨约束
+            for twist_type in ['腕捩', '手捩']:
+                for i in range(1, 4):
+                    shadow_name = f"_shadow_{side}{twist_type}{i}"
+                    if shadow_name not in pose_bones:
+                        continue
+                    shadow_bone = pose_bones[shadow_name]
+                    for c in list(shadow_bone.constraints):
+                        shadow_bone.constraints.remove(c)
+                    cc = shadow_bone.constraints.new('COPY_TRANSFORMS')
+                    cc.name = "mmd_tools_at_dummy"
+                    cc.target = obj
+                    cc.subtarget = f"_dummy_{side}{twist_type}{i}"
+                    cc.influence = 1.0
+                    cc.owner_space = 'POSE'
+                    cc.target_space = 'POSE'
 
 
 def register():
