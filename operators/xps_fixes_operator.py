@@ -779,17 +779,18 @@ class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
                     vg.remove(list(range(len(mesh.data.vertices))))
 
         # pelvis 系骨直接映射到下半身（保留 XPS 原始权重）
-        lower_body_bone = obj.data.bones.get('下半身')
-        if lower_body_bone:
-            if cls:
-                pelvis_bone_names = [
-                    b.name for b in obj.data.bones if cls.get(b.name) == 'pelvis'
-                ]
-            else:
-                pelvis_bone_names = [
-                    b.name for b in obj.data.bones
-                    if b.name.startswith('unused') and 'pelvis' in b.name.lower()
-                ]
+        # 第一次 transfer 时 下半身 骨可能还不存在，但先建 VG 转移权重，
+        # complete_bones 之后创建骨头会自动关联已有 VG
+        if cls:
+            pelvis_bone_names = [
+                b.name for b in obj.data.bones if cls.get(b.name) == 'pelvis'
+            ]
+        else:
+            pelvis_bone_names = [
+                b.name for b in obj.data.bones
+                if b.name.startswith('unused') and 'pelvis' in b.name.lower()
+            ]
+        if pelvis_bone_names:
             for mesh in mesh_objects:
                 lb_vg = mesh.vertex_groups.get('下半身')
                 if not lb_vg:
