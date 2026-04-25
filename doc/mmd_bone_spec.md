@@ -68,14 +68,22 @@ VMD 直接驱动，有 mesh 権重。
 | 左足首/右足首 | 左ひざ/右ひざ | True | 无 | 无 | 足首 |
 | 左足先EX/右足先EX | 左足首/右足首 | True | 无 | 无 | 足先 |
 | 左目/右目 | 頭 | True | 无 | 无 | 眼睛 |
-| fingers ×30 | 手首 | True | 无 | 无 | 指骨 |
+| 左人指０/右人指０ | 手首 | True | 无 | 无 | 人差指根 (pass-through) |
+| 左中指０/右中指０ | 手首 | True | 无 | 无 | 中指根 (pass-through) |
+| 左薬指０/右薬指０ | 手首 | True | 无 | 无 | 薬指根 (pass-through) |
+| 左小指０/右小指０ | 手首 | True | 无 | 无 | 小指根 (pass-through) |
+| 親指０~２ ×2 | 手首/親指 | True | 无 | 无 | 親指 |
+| 指１~３ ×8 | 指根０ | True | 无 | 无 | 指骨 |
 
 **要点**：
 - D 骨创建后，足/ひざ/足首 の VG 権重应被 copy 到 D 骨，**原骨権重清零**
 - 上半身1 的权重由 `_split_chain_weights` 从上半身 split 得来（上半身 と 上半身2 の中点）
 - 上半身3 的权重由 `_split_chain_weights` 从上半身2 split 得来
 - 下半身 的权重包含 pelvis VG 直接映射（在 complete_bones 之前就建好 VG）
+- 首1 的权重由 `_split_chain_weights` 从首 split 得来
 - D 骨创建后，足/ひざ/足首 の VG 権重 copy 到 D 骨，**原骨清零**
+- 指根骨 (人指０ 等) 是 pass-through，位置 = midpoint(手首.head, 指１.head)，0 権重
+- 指１ の parent 从手首改为対応指根骨
 
 ---
 

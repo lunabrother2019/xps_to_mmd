@@ -64,3 +64,56 @@
 | 2026-04-25 | v1.6 | VG cleanup 在 D骨之后跑 | one_click: cleanup 移到 step 5.5 |
 | 2026-04-25 | v1.6 | 足 残留 306/596 + 足D 275 | 足D: 581/871, 足: 0/0 |
 | 2026-04-25 | v1.6 | ひじ=0 排查 | 确认 XPS 源模型特征，非 bug |
+| 2026-04-25 | v1.7 | 指根骨缺失 | complete_bones: 人指０/中指０/薬指０/小指０ pass-through |
+
+## 版本变更概要
+
+### v1.3 (2026-04-25)
+- pelvis→下半身 VG 时序 bug 修复 (下半身 482→6797 verts)
+- 踩坑文档 `hip_butt_thigh_weight_guide.md` 重写
+
+### v1.4 (2026-04-25)
+- 一键转换按钮 (17 步全自动, ~2s)
+- VG rename: 先 rename VG 再 rename bone
+- one_click VG cleanup
+- Panel 重构
+
+### v1.5 (2026-04-25)
+- D 骨 TRANSFORM mix_mode: AFTER→ADD
+- D 骨 VG: rename→copy+clear
+- 上半身1 新建+split (5842 verts)
+- STANDARD_MMD_BONES 白名单
+- 捩 _dummy_/_shadow_ use_deform=False
+- ひじ→手首 gradient split 改 additive
+
+### v1.6 (2026-04-25)
+- 首1 新建+split (1134 verts)
+- VG cleanup 移到 step 5.5 (D 骨之前)
+- 足D/足残留修复
+
+### v1.7 (2026-04-25)
+- 指根骨 8 个 (pass-through, 不切権重)
+- 总骨骼 189 (v1.3 时 179)
+
+## Scale 踩坑记录
+
+**問題**: `bpy.ops.object.transform_apply(scale=True)` 在 MMD 模型上不稳定。
+
+**原因**: MMD 模型结构 `Empty(ROOT) → Armature → Mesh` + backup armature + rigidbody/joint 对象。
+Blender 3.6 的 transform_apply 在这种复杂层级下经常静默失败（scale 不归 1，bone data 不变）。
+
+**正确做法（稳定可靠）**: 导出 PMX 再 reimport。PMX 导出时 mmd_tools 会自动应用 root.scale，
+reimport 后 scale 自然是 1:1。
+
+```python
+# 设 scale
+root.scale = (scale_factor,) * 3
+
+# 导出（mmd_tools 自动应用 scale）
+bpy.ops.mmd_tools.export_pmx(filepath='path/to/auto.pmx')
+
+# 如需并排对比：reimport
+bpy.ops.mmd_tools.import_model(filepath='path/to/auto.pmx')
+```
+
+**不要**反复尝试 `transform_apply` — 浪费时间且结果不可靠。
