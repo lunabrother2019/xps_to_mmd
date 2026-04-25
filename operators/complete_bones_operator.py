@@ -307,46 +307,22 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 "parent": "上半身", "use_connect": False
             }
 
-        # 上半身1: spine middle があれば rename、なければ split で作成
+        # 上半身1 自动补全: 上半身 と 上半身2 の間
         upper1_just_created = False
-        spine_mid = edit_bones.get("spine middle")
         if (edit_bones.get("上半身") and edit_bones.get("上半身2")
                 and not edit_bones.get("上半身1")):
-            if spine_mid:
-                old_name = spine_mid.name
-                spine_mid.name = "上半身1"
-                spine_mid.parent = edit_bones["上半身"]
-                spine_mid.use_connect = False
-                spine_mid.tail = edit_bones["上半身2"].head.copy()
-                bone_properties["上半身"]["tail"] = spine_mid.head.copy()
+            ub_head = bone_properties["上半身"]["head"].copy()
+            ub2_head = bone_properties["上半身2"]["head"].copy()
+            mid = (ub_head + ub2_head) * 0.5
+            if (ub2_head - ub_head).length > bone_length * 0.2:
+                bone_properties["上半身"]["tail"] = mid.copy()
+                bone_properties["上半身1"] = {
+                    "head": mid.copy(),
+                    "tail": ub2_head.copy(),
+                    "parent": "上半身", "use_connect": False, "use_deform": True,
+                }
                 bone_properties["上半身2"]["parent"] = "上半身1"
-                # VG rename (edit mode で bone rename しても VG は自動で変わらない場合がある)
-                bpy.ops.object.mode_set(mode='OBJECT')
-                mesh_objects = [
-                    o for o in bpy.data.objects
-                    if o.type == 'MESH' and any(
-                        m.type == 'ARMATURE' and m.object == obj for m in o.modifiers
-                    )
-                ]
-                for mesh in mesh_objects:
-                    vg = mesh.vertex_groups.get(old_name)
-                    if vg and not mesh.vertex_groups.get("上半身1"):
-                        vg.name = "上半身1"
-                bpy.ops.object.mode_set(mode='EDIT')
-                print(f"[xps_to_mmd complete_bones] 上半身1: {old_name} を rename（XPS 原始権重保持）")
-            else:
-                ub_head = bone_properties["上半身"]["head"].copy()
-                ub2_head = bone_properties["上半身2"]["head"].copy()
-                mid = (ub_head + ub2_head) * 0.5
-                if (ub2_head - ub_head).length > bone_length * 0.2:
-                    bone_properties["上半身"]["tail"] = mid.copy()
-                    bone_properties["上半身1"] = {
-                        "head": mid.copy(),
-                        "tail": ub2_head.copy(),
-                        "parent": "上半身", "use_connect": False, "use_deform": True,
-                    }
-                    bone_properties["上半身2"]["parent"] = "上半身1"
-                    upper1_just_created = True
+                upper1_just_created = True
 
         # 上半身3 自动補全: 上半身2 と 首 の間
         upper3_just_created = False
