@@ -50,6 +50,15 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
             self.report({'ERROR'}, f"Step 0 自动识别失败: {e}")
             return {'CANCELLED'}
 
+        # Save XPS→MMD name mapping BEFORE rename (for final VG cleanup)
+        from ..bone_map_and_group import mmd_bone_map
+        from ..properties import PREFIX
+        xps_to_mmd_map = {}
+        for prop_name, mmd_name in mmd_bone_map.items():
+            xps_name = getattr(context.scene, PREFIX + prop_name, None)
+            if xps_name and xps_name != mmd_name:
+                xps_to_mmd_map[xps_name] = mmd_name
+
         # Run pipeline
         for step_num, op_id, label, critical in PIPELINE_STEPS:
             arm = _find_armature()
@@ -82,14 +91,7 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
 
         # Final cleanup: merge stranded VGs back to renamed equivalents
         arm = _find_armature()
-        if arm:
-            from ..bone_map_and_group import mmd_bone_map
-            from ..properties import PREFIX
-            reverse_map = {}
-            for prop_name, mmd_name in mmd_bone_map.items():
-                xps_name = getattr(context.scene, PREFIX + prop_name, None)
-                if xps_name and xps_name != mmd_name:
-                    reverse_map[xps_name] = mmd_name
+        if arm and xps_to_mmd_map:
             mesh_objects = [
                 o for o in bpy.data.objects
                 if o.type == 'MESH' and any(
@@ -98,7 +100,7 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
             ]
             merged = 0
             for mesh in mesh_objects:
-                for old_name, new_name in reverse_map.items():
+                for old_name, new_name in xps_to_mmd_map.items():
                     old_vg = mesh.vertex_groups.get(old_name)
                     if not old_vg:
                         continue

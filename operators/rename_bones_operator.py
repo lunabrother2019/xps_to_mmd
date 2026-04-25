@@ -66,6 +66,8 @@ class OBJECT_OT_rename_to_mmd(bpy.types.Operator):
                 else:
                     self.report({'WARNING'}, f"未找到骨骼 '{bone_name}' 以重命名为 {new_name}")
 
+        print(f"\n[xps_to_mmd rename] === Rename 開始 ({len(rename_map)} 骨) ===")
+
         if rename_map:
             vg_renamed = 0
             for mesh in mesh_objects:
@@ -77,13 +79,33 @@ class OBJECT_OT_rename_to_mmd(bpy.types.Operator):
             if vg_renamed > 0:
                 print(f"[xps_to_mmd rename] VG 先行 rename: {vg_renamed} 個")
 
+            renamed_list = []
             for prop_name, new_name in self.mmd_bone_map.items():
                 bone_name = getattr(scene, PREFIX + prop_name, None)
                 if bone_name:
                     bone = obj.pose.bones.get(bone_name)
                     if bone and bone.name != new_name:
+                        old = bone.name
                         bone.name = new_name
                         setattr(scene, PREFIX + prop_name, new_name)
+                        renamed_list.append((old, new_name))
+
+            print(f"[xps_to_mmd rename] --- Renamed ({len(renamed_list)}) ---")
+            for old, new in renamed_list:
+                print(f"  {old:<35} → {new}")
+
+        not_renamed = []
+        for bone in obj.data.bones:
+            if bone.name.startswith(('_dummy_', '_shadow_')):
+                continue
+            is_mmd = bone.name in self.mmd_bone_map.values()
+            is_known = bone.name.startswith(('unused', 'boob'))
+            if not is_mmd and not is_known:
+                not_renamed.append(bone.name)
+        if not_renamed:
+            print(f"[xps_to_mmd rename] --- 未 Rename ({len(not_renamed)}) ---")
+            for n in not_renamed:
+                print(f"  {n}")
 
         bpy.context.object.data.show_names = True
 
