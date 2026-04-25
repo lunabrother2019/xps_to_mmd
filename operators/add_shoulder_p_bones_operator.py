@@ -191,7 +191,12 @@ class OBJECT_OT_add_shoulder_p_bones(bpy.types.Operator):
                 transform_constraint.to_max_x_rot = math.radians(-180.0)
                 transform_constraint.to_max_y_rot = math.radians(-180.0)
                 transform_constraint.to_max_z_rot = math.radians(-180.0)
-                
+
+                p_name = c_name.replace("肩C", "肩P")
+                c_pose_bone.mmd_bone.has_additional_rotation = True
+                c_pose_bone.mmd_bone.additional_transform_bone = p_name
+                c_pose_bone.mmd_bone.additional_transform_influence = -1.0
+
                 # 为shadow骨骼添加COPY_TRANSFORMS约束
                 if shadow_bone_name in armature.pose.bones:
                     shadow_bone = armature.pose.bones[shadow_bone_name]

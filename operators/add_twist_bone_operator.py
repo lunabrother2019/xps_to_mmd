@@ -234,28 +234,19 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                     transform_constraint.from_max_z_rot = math.radians(180.0)
                     
                     # 根据骨骼索引设置不同的旋转限制（将角度转换为弧度）
-                    if i == 1:
-                        transform_constraint.to_min_x_rot = math.radians(-45.0)
-                        transform_constraint.to_min_y_rot = math.radians(-45.0)
-                        transform_constraint.to_min_z_rot = math.radians(-45.0)
-                        transform_constraint.to_max_x_rot = math.radians(45.0)
-                        transform_constraint.to_max_y_rot = math.radians(45.0)
-                        transform_constraint.to_max_z_rot = math.radians(45.0)
-                    elif i == 2:
-                        transform_constraint.to_min_x_rot = math.radians(-90.0)
-                        transform_constraint.to_min_y_rot = math.radians(-90.0)
-                        transform_constraint.to_min_z_rot = math.radians(-90.0)
-                        transform_constraint.to_max_x_rot = math.radians(90.0)
-                        transform_constraint.to_max_y_rot = math.radians(90.0)
-                        transform_constraint.to_max_z_rot = math.radians(90.0)
-                    elif i == 3:
-                        transform_constraint.to_min_x_rot = math.radians(-135.0)
-                        transform_constraint.to_min_y_rot = math.radians(-135.0)
-                        transform_constraint.to_min_z_rot = math.radians(-135.0)
-                        transform_constraint.to_max_x_rot = math.radians(135.0)
-                        transform_constraint.to_max_y_rot = math.radians(135.0)
-                        transform_constraint.to_max_z_rot = math.radians(135.0)
-            
+                    influence_map = {1: 0.25, 2: 0.5, 3: 0.75}
+                    angle = 45.0 * i
+                    transform_constraint.to_min_x_rot = math.radians(-angle)
+                    transform_constraint.to_min_y_rot = math.radians(-angle)
+                    transform_constraint.to_min_z_rot = math.radians(-angle)
+                    transform_constraint.to_max_x_rot = math.radians(angle)
+                    transform_constraint.to_max_y_rot = math.radians(angle)
+                    transform_constraint.to_max_z_rot = math.radians(angle)
+
+                    twist_bone.mmd_bone.has_additional_rotation = True
+                    twist_bone.mmd_bone.additional_transform_bone = f"{side}腕捩"
+                    twist_bone.mmd_bone.additional_transform_influence = influence_map[i]
+
             # 为手捩骨骼添加约束
             for i in range(1, 4):  # 手捩1, 手捩2, 手捩3
                 twist_bone_name = f"{side}手捩{i}"
@@ -296,28 +287,19 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                     transform_constraint.from_max_z_rot = math.radians(180.0)
                     
                     # 根据骨骼索引设置不同的旋转限制（将角度转换为弧度）
-                    if i == 1:
-                        transform_constraint.to_min_x_rot = math.radians(-45.0)
-                        transform_constraint.to_min_y_rot = math.radians(-45.0)
-                        transform_constraint.to_min_z_rot = math.radians(-45.0)
-                        transform_constraint.to_max_x_rot = math.radians(45.0)
-                        transform_constraint.to_max_y_rot = math.radians(45.0)
-                        transform_constraint.to_max_z_rot = math.radians(45.0)
-                    elif i == 2:
-                        transform_constraint.to_min_x_rot = math.radians(-90.0)
-                        transform_constraint.to_min_y_rot = math.radians(-90.0)
-                        transform_constraint.to_min_z_rot = math.radians(-90.0)
-                        transform_constraint.to_max_x_rot = math.radians(90.0)
-                        transform_constraint.to_max_y_rot = math.radians(90.0)
-                        transform_constraint.to_max_z_rot = math.radians(90.0)
-                    elif i == 3:
-                        transform_constraint.to_min_x_rot = math.radians(-135.0)
-                        transform_constraint.to_min_y_rot = math.radians(-135.0)
-                        transform_constraint.to_min_z_rot = math.radians(-135.0)
-                        transform_constraint.to_max_x_rot = math.radians(135.0)
-                        transform_constraint.to_max_y_rot = math.radians(135.0)
-                        transform_constraint.to_max_z_rot = math.radians(135.0)
-        
+                    influence_map = {1: 0.25, 2: 0.5, 3: 0.75}
+                    angle = 45.0 * i
+                    transform_constraint.to_min_x_rot = math.radians(-angle)
+                    transform_constraint.to_min_y_rot = math.radians(-angle)
+                    transform_constraint.to_min_z_rot = math.radians(-angle)
+                    transform_constraint.to_max_x_rot = math.radians(angle)
+                    transform_constraint.to_max_y_rot = math.radians(angle)
+                    transform_constraint.to_max_z_rot = math.radians(angle)
+
+                    twist_bone.mmd_bone.has_additional_rotation = True
+                    twist_bone.mmd_bone.additional_transform_bone = f"{side}手捩"
+                    twist_bone.mmd_bone.additional_transform_influence = influence_map[i]
+
         # 为shadow骨骼添加COPY_TRANSFORMS约束
         for side in ['左', '右']:
             # 腕捩shadow骨骼

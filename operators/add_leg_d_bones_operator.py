@@ -276,7 +276,11 @@ class OBJECT_OT_add_leg_d_bones(bpy.types.Operator):
                 transform_constraint.to_max_x_rot = math.radians(180.0)
                 transform_constraint.to_max_y_rot = math.radians(180.0)
                 transform_constraint.to_max_z_rot = math.radians(180.0)
-                
+
+                d_pose_bone.mmd_bone.has_additional_rotation = True
+                d_pose_bone.mmd_bone.additional_transform_bone = original_name
+                d_pose_bone.mmd_bone.additional_transform_influence = 1.0
+
                 # 为shadow骨骼添加COPY_TRANSFORMS约束
                 shadow_bone_name = f"_shadow_{d_name}"
                 if shadow_bone_name in armature.pose.bones:
