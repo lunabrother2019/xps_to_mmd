@@ -362,6 +362,35 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 bone_properties["頭"]["parent"] = "首1"
                 neck1_just_created = True
 
+        # 指根骨 (人指０/中指０/薬指０/小指０): pass-through, 不切権重
+        finger_root_defs = [
+            ("人指０", "人指１"), ("中指０", "中指１"),
+            ("薬指０", "薬指１"), ("小指０", "小指１"),
+        ]
+        for side in ("左", "右"):
+            wrist = edit_bones.get(f"{side}手首")
+            if not wrist:
+                continue
+            for root_base, first_base in finger_root_defs:
+                root_name = f"{side}{root_base}"
+                first_name = f"{side}{first_base}"
+                if edit_bones.get(root_name) or not edit_bones.get(first_name):
+                    continue
+                first_eb = edit_bones[first_name]
+                bone_properties[root_name] = {
+                    "head": (wrist.head + first_eb.head) * 0.5,
+                    "tail": first_eb.head.copy(),
+                    "parent": f"{side}手首",
+                    "use_connect": False,
+                    "use_deform": True,
+                }
+                bone_properties[first_name] = {
+                    "head": first_eb.head.copy(),
+                    "tail": first_eb.tail.copy(),
+                    "parent": root_name,
+                    "use_connect": False,
+                }
+
         # 按顺序検查并创建或更新骨骼
         for bone_name, properties in bone_properties.items():
             # 如果是足先EX且已经存在，保持其头位置不变
