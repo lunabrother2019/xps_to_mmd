@@ -430,16 +430,15 @@ class OBJECT_OT_generate_hair_physics(bpy.types.Operator):
                         size=size,
                         dynamics_type=mode,
                         collision_group_number=1,
-                        # Block body (overlap explosion) + self (intra-chain jitter)
-                        collision_group_mask=_mask_block_body_and_self(1),
+                        collision_group_mask=_mask_only_self(1),
                         name=name,
                         name_e=b.name,
                         bone=b.name,
-                        friction=DEFAULT_FRICTION,
+                        friction=0.0,
                         mass=mass,
                         angular_damping=ang_damp,
                         linear_damping=lin_damp,
-                        bounce=DEFAULT_BOUNCE,
+                        bounce=0.0,
                     )
                     total_rbs += 1
                 except Exception as e:
@@ -572,11 +571,11 @@ class OBJECT_OT_generate_breast_physics(bpy.types.Operator):
                     name=name,
                     name_e=b.name,
                     bone=b.name,
-                    friction=DEFAULT_FRICTION,
+                    friction=0.0,
                     mass=0.5,
-                    angular_damping=DEFAULT_DAMP,
-                    linear_damping=DEFAULT_DAMP,
-                    bounce=DEFAULT_BOUNCE,
+                    angular_damping=0.5,
+                    linear_damping=0.5,
+                    bounce=0.0,
                 )
                 total_rbs += 1
             except Exception as e:
