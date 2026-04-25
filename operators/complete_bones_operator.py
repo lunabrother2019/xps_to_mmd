@@ -383,6 +383,24 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 self.report({'WARNING'}, f"上半身3 权重分割失败: {e}")
             bpy.ops.object.mode_set(mode='EDIT')
 
+        # 腋窝平滑：肩→腕 追加权重 (additive, 不删肩权重)
+        # 让靠近腕端的肩顶点同时挂 肩+腕, export 时 normalize 到 BDEF2 平滑过渡
+        bpy.ops.object.mode_set(mode='OBJECT')
+        for side_jp in ("左", "右"):
+            shoulder = f"{side_jp}肩"
+            arm_bone = f"{side_jp}腕"
+            if obj.data.bones.get(shoulder) and obj.data.bones.get(arm_bone):
+                try:
+                    n, n_f = _split_chain_weights(
+                        obj, shoulder, arm_bone, shoulder, arm_bone,
+                        src_keep_floor=1.0,
+                    )
+                    if n > 0:
+                        print(f"[xps_to_mmd] 腋窝 {shoulder}→{arm_bone}: {n} verts smoothed")
+                except Exception as e:
+                    print(f"[xps_to_mmd] 腋窝平滑 {shoulder} 失败: {e}")
+        bpy.ops.object.mode_set(mode='EDIT')
+
         return {'FINISHED'}
 
 
