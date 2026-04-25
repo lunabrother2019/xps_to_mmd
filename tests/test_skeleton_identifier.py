@@ -20,6 +20,15 @@ class FakeVector:
     def __truediv__(self, s):
         return FakeVector(self.x / s, self.y / s, self.z / s)
 
+    def __mul__(self, s):
+        return FakeVector(self.x * s, self.y * s, self.z * s)
+
+    def __rmul__(self, s):
+        return self.__mul__(s)
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y + self.z * other.z
+
     def __iadd__(self, other):
         self.x += other.x
         self.y += other.y
@@ -32,6 +41,10 @@ class FakeVector:
     @property
     def length(self):
         return (self.x**2 + self.y**2 + self.z**2) ** 0.5
+
+    @property
+    def length_squared(self):
+        return self.x**2 + self.y**2 + self.z**2
 
     def normalized(self):
         ln = self.length
@@ -51,9 +64,28 @@ class FakeBone:
             parent.children.append(self)
 
 
+class FakeBoneCollection:
+    """List-like collection that also supports .get() by name."""
+    def __init__(self, bone_list):
+        self._list = bone_list
+        self._dict = {b.name: b for b in bone_list}
+
+    def __iter__(self):
+        return iter(self._list)
+
+    def __len__(self):
+        return len(self._list)
+
+    def __contains__(self, name):
+        return name in self._dict
+
+    def get(self, name, default=None):
+        return self._dict.get(name, default)
+
+
 class FakeArmatureData:
     def __init__(self, bone_list):
-        self.bones = bone_list
+        self.bones = FakeBoneCollection(bone_list)
 
 
 # Inject fake mathutils before importing skeleton_identifier
