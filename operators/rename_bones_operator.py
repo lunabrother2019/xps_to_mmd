@@ -48,6 +48,13 @@ class OBJECT_OT_rename_to_mmd(bpy.types.Operator):
         if not has_bone_set:
             self.report({'WARNING'}, "未设置骨骼")
             return {'CANCELLED'}
+        mesh_objects = [
+            o for o in bpy.data.objects
+            if o.type == 'MESH' and any(
+                m.type == 'ARMATURE' and m.object == obj for m in o.modifiers
+            )
+        ]
+
         rename_map = {}
         for prop_name, new_name in self.mmd_bone_map.items():
             bone_name = getattr(scene, PREFIX + prop_name, None)
@@ -55,29 +62,28 @@ class OBJECT_OT_rename_to_mmd(bpy.types.Operator):
                 bone = obj.pose.bones.get(bone_name)
                 if bone:
                     if bone.name != new_name:
-                        old_name = bone.name
-                        bone.name = new_name
-                        rename_map[old_name] = new_name
-                        setattr(scene, PREFIX + prop_name, new_name)
+                        rename_map[bone.name] = new_name
                 else:
                     self.report({'WARNING'}, f"未找到骨骼 '{bone_name}' 以重命名为 {new_name}")
 
         if rename_map:
-            mesh_objects = [
-                o for o in bpy.data.objects
-                if o.type == 'MESH' and any(
-                    m.type == 'ARMATURE' and m.object == obj for m in o.modifiers
-                )
-            ]
-            vg_fixed = 0
+            vg_renamed = 0
             for mesh in mesh_objects:
                 for old_name, new_name in rename_map.items():
                     vg = mesh.vertex_groups.get(old_name)
                     if vg and not mesh.vertex_groups.get(new_name):
                         vg.name = new_name
-                        vg_fixed += 1
-            if vg_fixed > 0:
-                print(f"[xps_to_mmd rename] VG 补正: {vg_fixed} 个 vertex group 重命名")
+                        vg_renamed += 1
+            if vg_renamed > 0:
+                print(f"[xps_to_mmd rename] VG 先行 rename: {vg_renamed} 個")
+
+            for prop_name, new_name in self.mmd_bone_map.items():
+                bone_name = getattr(scene, PREFIX + prop_name, None)
+                if bone_name:
+                    bone = obj.pose.bones.get(bone_name)
+                    if bone and bone.name != new_name:
+                        bone.name = new_name
+                        setattr(scene, PREFIX + prop_name, new_name)
 
         bpy.context.object.data.show_names = True
 
