@@ -849,61 +849,7 @@ class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
 
 _CLASSES = _CLASSES + (OBJECT_OT_transfer_unused_weights,)
 
-
-# ============================================================
-# 3g. Fix bone visibility to match MMD convention
-# ============================================================
-
-class OBJECT_OT_fix_bone_visibility(bpy.types.Operator):
-    """按 MMD 付与親规则设置骨骼显示/隐藏（不影响权重和动画）。
-    有 additional_transform（付与親 slave）的骨隐藏，D 骨例外。"""
-    bl_idname = "object.xps_fix_bone_visibility"
-    bl_label = "修正骨骼显示"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @staticmethod
-    def _is_d_bone(name):
-        base = name
-        for suffix in ('.L', '.R'):
-            if base.endswith(suffix):
-                base = base[:-len(suffix)]
-                break
-        return base.endswith('D')
-
-    def execute(self, context):
-        obj = context.active_object
-        if not obj or obj.type != 'ARMATURE':
-            self.report({'ERROR'}, "请先选中骨架")
-            return {'CANCELLED'}
-
-        shown = []
-        hidden = []
-        for bone in obj.data.bones:
-            pb = obj.pose.bones.get(bone.name)
-            if not pb:
-                continue
-            mmd = pb.mmd_bone
-            is_slave = mmd.has_additional_rotation and mmd.additional_transform_bone
-            should_hide = is_slave and not self._is_d_bone(bone.name)
-
-            if should_hide and not bone.hide:
-                bone.hide = True
-                hidden.append(bone.name)
-            elif bone.hide and is_slave and self._is_d_bone(bone.name):
-                bone.hide = False
-                shown.append(bone.name)
-
-        if shown:
-            print(f"[fix_visibility] 显示: {shown}")
-        if hidden:
-            print(f"[fix_visibility] 隐藏: {hidden}")
-
-        total = len(shown) + len(hidden)
-        self.report({'INFO'}, f"修正 {total} 骨显示状態" if total else "无需修正")
-        return {'FINISHED'}
-
-
-_CLASSES = _CLASSES + (OBJECT_OT_fix_bone_visibility,)
+_CLASSES = _CLASSES + ()
 
 
 def register():

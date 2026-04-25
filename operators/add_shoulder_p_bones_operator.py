@@ -196,6 +196,7 @@ class OBJECT_OT_add_shoulder_p_bones(bpy.types.Operator):
                 c_pose_bone.mmd_bone.has_additional_rotation = True
                 c_pose_bone.mmd_bone.additional_transform_bone = p_name
                 c_pose_bone.mmd_bone.additional_transform_influence = -1.0
+                armature.data.bones[c_name].hide = True
 
                 # 为shadow骨骼添加COPY_TRANSFORMS约束
                 if shadow_bone_name in armature.pose.bones:

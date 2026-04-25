@@ -463,6 +463,7 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                     twist_bone.mmd_bone.has_additional_rotation = True
                     twist_bone.mmd_bone.additional_transform_bone = f"{side}{twist_type}"
                     twist_bone.mmd_bone.additional_transform_influence = influence_map[i]
+                    obj.data.bones[twist_bone.name].hide = True
 
             # shadow 骨约束
             for twist_type in ['腕捩', '手捩']:
