@@ -162,9 +162,16 @@ def _map_spine(chain, leg_idx, arm_idx, result):
     if leg_idx is not None and leg_idx > 0:
         result["all_parents_bone"] = chain[0].name
 
-    # Center (hips)
+    # Center (hips): if the leg fork bone's parent is center-ish with only 1 child,
+    # prefer the parent (e.g., "root hips" over "unused bip001 pelvis")
     if leg_idx is not None:
-        result["center_bone"] = chain[leg_idx].name
+        fork = chain[leg_idx]
+        if (leg_idx > 1
+                and len(chain[leg_idx - 1].children) == 1
+                and abs(chain[leg_idx - 1].head_local.x) < 0.01):
+            result["center_bone"] = chain[leg_idx - 1].name
+        else:
+            result["center_bone"] = fork.name
 
     if arm_idx is None:
         # Only leg fork found — map remaining chain above legs
@@ -468,17 +475,18 @@ def _map_eyes(bones, head_name, result):
     # Find symmetric pairs by matching |X| and Z
     best_pair = None
     best_score = float('inf')
+    x_min = 0.02
+    sym_tol = 0.01
     for i, c1 in enumerate(candidates):
-        if c1.head_local.x <= 0.005:
+        if c1.head_local.x <= x_min:
             continue
         for c2 in candidates[i + 1:]:
-            if c2.head_local.x >= -0.005:
+            if c2.head_local.x >= -x_min:
                 continue
             dx = abs(abs(c1.head_local.x) - abs(c2.head_local.x))
             dz = abs(c1.head_local.z - c2.head_local.z)
             dy = abs(c1.head_local.y - c2.head_local.y)
-            if dx < 0.05 and dz < 0.05 and dy < 0.05:
-                # Prefer the most forward pair (most negative Y = in front of face)
+            if dx < sym_tol and dz < sym_tol and dy < sym_tol:
                 score = c1.head_local.y + c2.head_local.y
                 if score < best_score:
                     best_score = score
