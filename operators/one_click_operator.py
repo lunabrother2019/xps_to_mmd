@@ -80,6 +80,43 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
         except Exception as e:
             results.append(("8.5", "apply_additional_transform", f"WARN: {e}"))
 
+        # Final cleanup: merge stranded VGs back to renamed equivalents
+        arm = _find_armature()
+        if arm:
+            from ..bone_map_and_group import mmd_bone_map
+            from ..properties import PREFIX
+            reverse_map = {}
+            for prop_name, mmd_name in mmd_bone_map.items():
+                xps_name = getattr(context.scene, PREFIX + prop_name, None)
+                if xps_name and xps_name != mmd_name:
+                    reverse_map[xps_name] = mmd_name
+            mesh_objects = [
+                o for o in bpy.data.objects
+                if o.type == 'MESH' and any(
+                    m.type == 'ARMATURE' and m.object == arm for m in o.modifiers
+                )
+            ]
+            merged = 0
+            for mesh in mesh_objects:
+                for old_name, new_name in reverse_map.items():
+                    old_vg = mesh.vertex_groups.get(old_name)
+                    if not old_vg:
+                        continue
+                    new_vg = mesh.vertex_groups.get(new_name)
+                    if not new_vg:
+                        old_vg.name = new_name
+                        merged += 1
+                        continue
+                    for v in mesh.data.vertices:
+                        for g in v.groups:
+                            if g.group == old_vg.index and g.weight > 0.001:
+                                new_vg.add([v.index], g.weight, 'ADD')
+                                break
+                    mesh.vertex_groups.remove(old_vg)
+                    merged += 1
+            if merged > 0:
+                results.append(("9", f"VG 残留清理 ({merged})", "OK"))
+
         total = time.time() - t_start
         self._print_summary(results, total)
 
