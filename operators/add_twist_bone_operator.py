@@ -261,6 +261,7 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                         aux.tail = shadow_head + Vector((0, 0, 0.08))
                         aux.parent = parent_bone or seg_from_eb
                         aux.use_connect = False
+                        aux.use_deform = False
                         aux.roll = 0.0
 
             # reparent：子关节 → 主 twist
@@ -305,15 +306,20 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                         vg_arm.name = twist_name
                 print(f"[twist] Swap VG: {arm_name} <-> {twist_name}")
 
-        # Phase 5: PMXEditor 风格 twist 权重渐变
-        # 把腕/ひじ的权重按 t 位置分配到 5 个 anchor 骨上
+        # Phase 5: twist 权重渐变
+        # 腕→ひじ: redistribute (腕 weights split to 腕捩 sub-bones, 腕 removed)
+        # ひじ→手首: additive (ひじ weights KEPT intact, 手捩 sub-bones get overlay copy)
         DEAD_ZONE = 0.05
-        gradient_segments = [
+        REDISTRIBUTE = [
             ("腕", "ひじ", [("腕", 0.00), ("腕捩1", 0.25), ("腕捩2", 0.50), ("腕捩3", 0.75), ("腕捩", 1.00)]),
+        ]
+        ADDITIVE = [
             ("ひじ", "手首", [("ひじ", 0.00), ("手捩1", 0.25), ("手捩2", 0.50), ("手捩3", 0.75), ("手捩", 1.00)]),
         ]
         total_split = 0
-        for seg_from_base, seg_to_base, anchors_def in gradient_segments:
+        for seg_def in REDISTRIBUTE + ADDITIVE:
+            seg_from_base, seg_to_base, anchors_def = seg_def
+            is_additive = any(s[0] == seg_from_base for s in ADDITIVE)
             for side in ("左", "右"):
                 seg_from_name = side + seg_from_base
                 seg_to_name = side + seg_to_base
@@ -347,14 +353,6 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                         src_w = next((g.weight for g in v.groups if g.group == src_vg.index), 0.0)
                         if src_w <= 0:
                             continue
-                        existing = {}
-                        for bone_name, vg in vgs.items():
-                            if bone_name == source_name:
-                                continue
-                            for g in v.groups:
-                                if g.group == vg.index:
-                                    existing[bone_name] = g.weight
-                                    break
                         v_world = mesh.matrix_world @ v.co
                         t = (v_world - seg_head).dot(seg) / seg_len_sq
                         if t < DEAD_ZONE:
@@ -369,30 +367,32 @@ class OBJECT_OT_add_twist_bone(bpy.types.Operator):
                                 k = (t - t_lo) / span if span > 0 else 0.0
                                 n_lo, n_hi = name_lo, name_hi
                                 break
+                        plans.append((v.index, n_lo, n_hi, k, src_w))
+
+                    for v_idx, n_lo, n_hi, k, src_w in plans:
                         w_lo = src_w * (1.0 - k)
                         w_hi = src_w * k
-                        plans.append((v.index, n_lo, w_lo, n_hi, w_hi, existing, t, src_w))
-
-                    for v_idx, n_lo, w_lo, n_hi, w_hi, existing, t, orig_w in plans:
-                        if n_lo == source_name:
-                            if w_lo > 0:
-                                vgs[n_lo].add([v_idx], w_lo, 'REPLACE')
-                            else:
-                                src_vg.remove([v_idx])
+                        if is_additive:
+                            if n_lo != source_name and w_lo > 0:
+                                vgs[n_lo].add([v_idx], w_lo, 'ADD')
+                            if n_hi != source_name and w_hi > 0:
+                                vgs[n_hi].add([v_idx], w_hi, 'ADD')
                         else:
-                            vgs[n_lo].add([v_idx], existing.get(n_lo, 0.0) + w_lo, 'REPLACE')
-                        if w_hi > 0:
-                            vgs[n_hi].add([v_idx], existing.get(n_hi, 0.0) + w_hi, 'REPLACE')
-                        if n_lo != source_name:
-                            retain = orig_w * max(0.0, 1.0 - t)
-                            if retain > 0.01:
-                                src_vg.add([v_idx], retain, 'REPLACE')
+                            if n_lo == source_name:
+                                if w_lo > 0:
+                                    vgs[n_lo].add([v_idx], w_lo, 'REPLACE')
+                                else:
+                                    src_vg.remove([v_idx])
                             else:
+                                vgs[n_lo].add([v_idx], w_lo, 'ADD')
                                 src_vg.remove([v_idx])
+                            if w_hi > 0:
+                                vgs[n_hi].add([v_idx], w_hi, 'ADD')
                         total_split += 1
 
                 if total_split > 0:
-                    print(f"[twist] gradient split {seg_from_name}→{seg_to_name}: done")
+                    mode = "additive" if is_additive else "redistribute"
+                    print(f"[twist] gradient split {seg_from_name}→{seg_to_name}: {mode}")
 
         print(f"[twist] gradient split total: {total_split} verts")
 

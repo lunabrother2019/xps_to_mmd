@@ -302,13 +302,24 @@ class OBJECT_OT_add_leg_d_bones(bpy.types.Operator):
                     # 移除目标剪切
                     shadow_constraint.remove_target_shear = False
                 
-                # 把标准骨骼对应的顶点组名字改成D骨骼的名字
+                # copy 主骨权重到 D 骨，然后清零主骨
                 for mesh in bpy.context.scene.objects:
                     if mesh.type == 'MESH' and mesh.parent == armature:
-                        if original_name in mesh.vertex_groups:
-                            # 重命名顶点组
-                            vg = mesh.vertex_groups[original_name]
-                            vg.name = d_name
+                        src_vg = mesh.vertex_groups.get(original_name)
+                        if not src_vg:
+                            continue
+                        dst_vg = mesh.vertex_groups.get(d_name)
+                        if not dst_vg:
+                            dst_vg = mesh.vertex_groups.new(name=d_name)
+                        verts_to_clear = []
+                        for v in mesh.data.vertices:
+                            for g in v.groups:
+                                if g.group == src_vg.index and g.weight > 0:
+                                    dst_vg.add([v.index], g.weight, 'REPLACE')
+                                    verts_to_clear.append(v.index)
+                                    break
+                        if verts_to_clear:
+                            src_vg.remove(verts_to_clear)
         
         # 返回物体模式
         bpy.ops.object.mode_set(mode='OBJECT')

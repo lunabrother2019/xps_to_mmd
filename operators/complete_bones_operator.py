@@ -307,16 +307,24 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 "parent": "上半身", "use_connect": False
             }
 
-        # 上半身3 自动补全 (坑 1 + 坑 3 的 VMD 语义必需骨):
-        #   VMD 标准规格包含上半身3 keyframe，缺此骨 → 上半身僵硬。
-        #   target PMX 实测约 10900 verts 挂在上半身3，腋窝顶点几乎全部
-        #   同时挂 肩+腕+上半身3。
-        # 逻辑:
-        #   - 只在 上半身2 + 首 都存在，且上半身3 当前不存在时创建
-        #   - 上半身2.tail 改为 (上半身2.head → 首.head) 中点，让出位置
-        #   - 上半身3: head = 中点, tail = 首.head, parent = 上半身2
-        #   - 首.parent 从 上半身2 改为 上半身3
-        #   - 创建后进行权重沿段 t 线性迁移 (上半身2 → 上半身3)
+        # 上半身1 自动补全: 上半身 と 上半身2 の間
+        upper1_just_created = False
+        if (edit_bones.get("上半身") and edit_bones.get("上半身2")
+                and not edit_bones.get("上半身1")):
+            ub_head = bone_properties["上半身"]["head"].copy()
+            ub2_head = bone_properties["上半身2"]["head"].copy()
+            mid = (ub_head + ub2_head) * 0.5
+            if (ub2_head - ub_head).length > bone_length * 0.2:
+                bone_properties["上半身"]["tail"] = mid.copy()
+                bone_properties["上半身1"] = {
+                    "head": mid.copy(),
+                    "tail": ub2_head.copy(),
+                    "parent": "上半身", "use_connect": False, "use_deform": True,
+                }
+                bone_properties["上半身2"]["parent"] = "上半身1"
+                upper1_just_created = True
+
+        # 上半身3 自动補全: 上半身2 と 首 の間
         upper3_just_created = False
         if (edit_bones.get("上半身2") and edit_bones.get("首")
                 and not edit_bones.get("上半身3")):
@@ -379,6 +387,19 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
 
         # 连接手指骨骼的头尾
         self.connect_finger_bones(edit_bones)
+
+        # 上半身1 自动权重分割
+        if upper1_just_created:
+            bpy.ops.object.mode_set(mode='OBJECT')
+            try:
+                moved, filtered = _split_chain_weights(
+                    obj, "上半身", "上半身1", "上半身", "上半身2"
+                )
+                print(f"[xps_to_mmd complete_bones] 上半身1 auto-weight: "
+                      f"{moved} verts split from 上半身, {filtered} filtered by perp")
+            except Exception as e:
+                print(f"[xps_to_mmd complete_bones] 上半身1 权重分割失败: {e}")
+            bpy.ops.object.mode_set(mode='EDIT')
 
         # 上半身3 自动权重分割 (仅当本次自动创建时触发)
         # 回到 OBJECT mode 才能改 vertex group
