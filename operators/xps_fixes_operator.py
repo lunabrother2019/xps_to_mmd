@@ -638,7 +638,86 @@ _CLASSES = (
     OBJECT_OT_fix_forearm_bend,
     OBJECT_OT_swap_twist_weights,
     OBJECT_OT_snap_misaligned_bones,
+    OBJECT_OT_transfer_unused_weights,
 )
+
+
+# ============================================================
+# 3f. Transfer unused bone weights to nearest valid bone
+# ============================================================
+
+class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
+    """把 unused 前缀骨骼的顶点权重转移到最近的有效变形骨。
+
+    XPS extra 骨 (xtra07, foretwist 等) rename 后带 'unused' 前缀但保留
+    vertex weight。这些骨的 parent 往往是手臂/腿骨，动画时拉飞肩颈/躯干顶点。
+    """
+    bl_idname = "object.xps_transfer_unused_weights"
+    bl_label = "转移 unused 骨权重"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'ARMATURE':
+            self.report({'ERROR'}, "请先选中骨架")
+            return {'CANCELLED'}
+
+        mesh_objects = [
+            o for o in bpy.data.objects
+            if o.type == 'MESH' and any(
+                m.type == 'ARMATURE' and m.object == obj for m in o.modifiers
+            )
+        ]
+        if not mesh_objects:
+            self.report({'ERROR'}, "未找到挂此 armature 的 mesh")
+            return {'CANCELLED'}
+
+        unused_bones = [b for b in obj.data.bones if b.name.startswith('unused')]
+        if not unused_bones:
+            self.report({'INFO'}, "无 unused 骨骼")
+            return {'FINISHED'}
+
+        valid_deform_bones = [
+            b for b in obj.data.bones
+            if not b.name.startswith('unused')
+            and not b.name.startswith('_shadow')
+            and not b.name.startswith('_dummy')
+            and b.use_deform
+        ]
+        if not valid_deform_bones:
+            self.report({'ERROR'}, "无有效变形骨")
+            return {'CANCELLED'}
+
+        valid_heads = [(b, obj.matrix_world @ b.head_local) for b in valid_deform_bones]
+
+        total_transferred = 0
+        for mesh in mesh_objects:
+            for ubone in unused_bones:
+                vg = mesh.vertex_groups.get(ubone.name)
+                if not vg:
+                    continue
+                ubone_head = obj.matrix_world @ ubone.head_local
+                nearest_bone = min(valid_heads, key=lambda bh: (bh[1] - ubone_head).length)[0]
+
+                target_vg = mesh.vertex_groups.get(nearest_bone.name)
+                if not target_vg:
+                    target_vg = mesh.vertex_groups.new(name=nearest_bone.name)
+
+                n = 0
+                for v in mesh.data.vertices:
+                    for g in v.groups:
+                        if g.group == vg.index and g.weight > 0.001:
+                            target_vg.add([v.index], g.weight, 'ADD')
+                            n += 1
+                            break
+
+                if n > 0:
+                    print(f"[xps_fixes unused] {ubone.name} → {nearest_bone.name}: {n} verts")
+                    total_transferred += n
+                mesh.vertex_groups.remove(vg)
+
+        self.report({'INFO'}, f"转移 {total_transferred} 顶点权重，清理 {len(unused_bones)} unused VG")
+        return {'FINISHED'}
 
 
 def register():

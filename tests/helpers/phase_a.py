@@ -57,6 +57,13 @@ def run_main_pipeline(xps_path, preset_name, report):
     except Exception as e:
         results['1_rename'] = {'status': 'fail', 'error': str(e)}
 
+    # Step 1.4: Transfer unused bone weights to nearest valid bone
+    try:
+        bpy.ops.object.xps_transfer_unused_weights()
+        results['1_4_unused_weights'] = {'status': 'ok'}
+    except Exception as e:
+        results['1_4_unused_weights'] = {'status': 'warn', 'error': str(e)}
+
     # Step 1.5: L1 rest pose alignment (canonical) — reduces wrist drift in VMD playback
     # Runs after rename so MMD-side bone names (腕.L/ひじ.L/手首.L or 左腕/左ひじ/左手首) exist
     try:
