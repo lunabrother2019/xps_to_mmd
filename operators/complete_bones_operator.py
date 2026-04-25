@@ -341,6 +341,15 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
             edit_bones["右足首"].tail = edit_bones["右足先EX"].head
 
 
+        # 二次 pass 修复 parent 依赖顺序问题
+        # (首 在 dict 中先于 上半身3，create_or_update_bone 时 上半身3 还不存在)
+        for bone_name, properties in bone_properties.items():
+            parent_name = properties.get("parent")
+            if parent_name and bone_name in edit_bones:
+                parent_bone = edit_bones.get(parent_name)
+                if parent_bone and edit_bones[bone_name].parent != parent_bone:
+                    edit_bones[bone_name].parent = parent_bone
+
         # 调用函数设置 roll 値
         bone_utils.set_roll_values(edit_bones, bone_utils.DEFAULT_ROLL_VALUES)
 
