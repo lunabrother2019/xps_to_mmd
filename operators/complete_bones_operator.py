@@ -192,19 +192,19 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 "head": edit_bones["左腕"].head,
                 "tail": edit_bones["左ひじ"].head,
                 "parent": "左肩",
-                "use_connect": True
+                "use_connect": False
             },
             "左ひじ": {
                 "head": edit_bones["左ひじ"].head,
                 "tail": edit_bones["左手首"].head if edit_bones["左手首"]else edit_bones["左ひじ"].tail,
                 "parent": "左腕",
-                "use_connect": True
+                "use_connect": False
             },
             "左手首": {
                 "head": edit_bones["左手首"].head,
                 "tail": edit_bones["左中指１"].head.copy() if edit_bones.get("左中指１") else edit_bones["左手首"].tail,
                 "parent": "左ひじ",
-                "use_connect": True
+                "use_connect": False
             },
 
             "右肩": {
@@ -217,19 +217,19 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 "head": edit_bones["右腕"].head,
                 "tail": edit_bones["右ひじ"].head,
                 "parent": "右肩",
-                "use_connect": True
+                "use_connect": False
             },
             "右ひじ": {
                 "head": edit_bones["右ひじ"].head,
                 "tail": edit_bones["右手首"].head if edit_bones["右手首"]else edit_bones["右ひじ"].tail,
                 "parent": "右腕",
-                "use_connect": True
+                "use_connect": False
             },
             "右手首": {
                 "head": edit_bones["右手首"].head,
                 "tail": edit_bones["右中指１"].head.copy() if edit_bones.get("右中指１") else edit_bones["右手首"].tail,
                 "parent": "右ひじ",
-                "use_connect": True
+                "use_connect": False
             },
 
             "下半身": {"head": Vector((0, upper_body_head.y, upper_body_head.z)), "tail": Vector((0, upper_body_head.y, upper_body_head.z - bone_length)), "parent": "腰", "use_connect": False},
