@@ -67,19 +67,37 @@ steps = [
 
 ### 4. 缩放到目标大小
 
-XPS 模型原生 ~1.6m，MMD 标准 ~21 单位。需要缩放 ~12.4 倍：
+XPS 模型原生 ~1.6m，MMD 标准 ~21 单位。需要缩放 ~12.4 倍。
+
+**⚠ transform_apply 踩坑**：MMD 模型结构是 `Empty(ROOT) → Armature → Mesh`。
+`root.scale = (12.4,)×3` 只改了 Empty 的 Object 级别显示缩放，bone data 和 vertex data
+还是原始大小。VMD 动画驱动的是 bone data 坐标系，scale 不 apply 的话动画位移量不匹配
+（模型会飘或趴地上）。
+
+`transform_apply(scale=True)` 的作用：把 Object 级 scale 乘进 data 本身
+（bone.head *= scale, vertex.co *= scale），然后把 object.scale 重置为 (1,1,1)。
+
+**但 Empty 没有 data**，只选 root 的话 apply 对 Armature/Mesh children 不生效。
+必须选中 root + 所有 children 再 apply：
 
 ```python
+import mmd_tools.core.model as Model
+
 target_height = 21.02  # 从 target PMX 量得
-our_height = max(b.head_local.z for b in arm.data.bones) - min(...)
+our_height = max(b.head_local.z for b in arm.data.bones) - min(b.head_local.z for b in arm.data.bones)
 scale_factor = target_height / our_height
 
-root = Model.findRoot(arm)
+root = Model.Model.findRoot(arm)
+root.scale = (scale_factor,) * 3
+
+# 必须选中 root + 全部 children 再 apply，否则只有 Empty scale 归 1 但 bone/vertex 没变
 bpy.ops.object.select_all(action='DESELECT')
 root.select_set(True)
-bpy.ops.object.select_hierarchy(direction='CHILD', extend=True)
-root.scale = (scale_factor,) * 3
+bpy.context.view_layer.objects.active = root
+for c in root.children_recursive:
+    c.select_set(True)
 bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+# 验证: root.scale 应为 (1,1,1)，bone height 应 ≈ target_height
 ```
 
 ### 5. 导出 PMX
