@@ -345,7 +345,24 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 bone_properties["首"]["parent"] = "上半身3"
                 upper3_just_created = True
 
-        # 按顺序检查并创建或更新骨骼
+        # 首1 自动補全: 首 と 頭 の間
+        neck1_just_created = False
+        if (edit_bones.get("首") and edit_bones.get("頭")
+                and not edit_bones.get("首1")):
+            neck_head = bone_properties["首"]["head"].copy()
+            head_head = bone_properties["頭"]["head"].copy()
+            neck_mid = (neck_head + head_head) * 0.5
+            if (head_head - neck_head).length > bone_length * 0.2:
+                bone_properties["首"]["tail"] = neck_mid.copy()
+                bone_properties["首1"] = {
+                    "head": neck_mid.copy(),
+                    "tail": head_head.copy(),
+                    "parent": "首", "use_connect": False, "use_deform": True,
+                }
+                bone_properties["頭"]["parent"] = "首1"
+                neck1_just_created = True
+
+        # 按顺序検查并创建或更新骨骼
         for bone_name, properties in bone_properties.items():
             # 如果是足先EX且已经存在，保持其头位置不变
             if bone_name in ["左足先EX", "右足先EX"] and bone_name in edit_bones:
@@ -420,8 +437,20 @@ class OBJECT_OT_complete_missing_bones(bpy.types.Operator):
                 self.report({'WARNING'}, f"上半身3 权重分割失败: {e}")
             bpy.ops.object.mode_set(mode='EDIT')
 
-        # 腋窝平滑：肩→腕 追加权重 (additive, 不删肩权重)
-        # 让靠近腕端的肩顶点同时挂 肩+腕, export 时 normalize 到 BDEF2 平滑过渡
+        # 首1 自动权重分割
+        if neck1_just_created:
+            bpy.ops.object.mode_set(mode='OBJECT')
+            try:
+                moved, filtered = _split_chain_weights(
+                    obj, "首", "首1", "首", "頭"
+                )
+                print(f"[xps_to_mmd complete_bones] 首1 auto-weight: "
+                      f"{moved} verts split from 首, {filtered} filtered by perp")
+            except Exception as e:
+                print(f"[xps_to_mmd complete_bones] 首1 权重分割失败: {e}")
+            bpy.ops.object.mode_set(mode='EDIT')
+
+        # 腋窝平滑：肩→腕 追加权重 (additive, 不删肩権重)
         bpy.ops.object.mode_set(mode='OBJECT')
         for side_jp in ("左", "右"):
             shoulder = f"{side_jp}肩"

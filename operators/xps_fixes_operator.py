@@ -659,7 +659,7 @@ class OBJECT_OT_transfer_unused_weights(bpy.types.Operator):
     SKIP_PATTERNS = ('foretwist', 'pelvis', 'xtra08', 'xtra04', 'xtra02', 'xtra07', 'muscle')
     CONTROL_BONES = ('全ての親', 'センター', 'グルーブ')
     STANDARD_MMD_BONES = frozenset((
-        '上半身', '上半身1', '上半身2', '上半身3', '下半身', '首', '頭', '腰',
+        '上半身', '上半身1', '上半身2', '上半身3', '下半身', '首', '首1', '頭', '腰',
         '左肩', '右肩', '左腕', '右腕', '左ひじ', '右ひじ', '左手首', '右手首',
         '左足', '右足', '左ひざ', '右ひざ', '左足首', '右足首', '左足先EX', '右足先EX',
         '左目', '右目', '腰キャンセル.L', '腰キャンセル.R',

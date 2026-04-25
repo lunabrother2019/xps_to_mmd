@@ -2,7 +2,7 @@ import bpy
 import time
 
 
-PIPELINE_STEPS = [
+PIPELINE_PRE_D = [
     ("0.5", "object.xps_correct_bones", "归正骨架位置", True),
     ("1", "object.xps_rename_to_mmd", "重命名为 MMD", True),
     ("1.4", "object.xps_transfer_unused_weights", "转移 unused 权重 (第一次)", False),
@@ -14,6 +14,9 @@ PIPELINE_STEPS = [
     ("3", "object.xps_add_mmd_ik", "添加 MMD IK", True),
     ("4", "object.xps_create_bone_group", "创建骨骼集合", True),
     ("5", "object.xps_use_mmd_tools_convert", "mmd_tools 转换", True),
+]
+
+PIPELINE_POST_D = [
     ("6", "object.xps_add_leg_d_bones", "添加腿部 D 骨", False),
     ("7", "object.xps_add_twist_bone", "添加捩骨", False),
     ("8", "object.xps_add_shoulder_p_bones", "添加肩P骨", False),
@@ -59,8 +62,8 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
             if xps_name and xps_name != mmd_name:
                 xps_to_mmd_map[xps_name] = mmd_name
 
-        # Run pipeline
-        for step_num, op_id, label, critical in PIPELINE_STEPS:
+        # Run pipeline (pre-D: steps 0.5 ~ 5)
+        for step_num, op_id, label, critical in PIPELINE_PRE_D:
             arm = _find_armature()
             if arm:
                 context.view_layer.objects.active = arm
@@ -82,14 +85,7 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
                     self.report({'ERROR'}, f"Step {step_num} {label} 失败: {e}")
                     return {'CANCELLED'}
 
-        # apply_additional_transform
-        try:
-            bpy.ops.mmd_tools.apply_additional_transform()
-            results.append(("8.5", "apply_additional_transform", "OK"))
-        except Exception as e:
-            results.append(("8.5", "apply_additional_transform", f"WARN: {e}"))
-
-        # Final cleanup: merge stranded VGs back to renamed equivalents
+        # VG cleanup: merge stranded old-name VGs BEFORE D-bone copy
         arm = _find_armature()
         if arm and xps_to_mmd_map:
             mesh_objects = [
@@ -117,7 +113,33 @@ class OBJECT_OT_one_click_convert(bpy.types.Operator):
                     mesh.vertex_groups.remove(old_vg)
                     merged += 1
             if merged > 0:
-                results.append(("9", f"VG 残留清理 ({merged})", "OK"))
+                results.append(("5.5", f"VG 残留清理 ({merged})", "OK"))
+
+        # Run pipeline (post-D: steps 6 ~ 8)
+        for step_num, op_id, label, critical in PIPELINE_POST_D:
+            arm = _find_armature()
+            if arm:
+                context.view_layer.objects.active = arm
+                arm.select_set(True)
+
+            parts = op_id.split('.')
+            op_func = getattr(getattr(bpy.ops, parts[0]), parts[1])
+
+            try:
+                t = time.time()
+                result = op_func()
+                dt = time.time() - t
+                status = "OK" if result == {'FINISHED'} else str(result)
+                results.append((step_num, label, f"{status} ({dt:.1f}s)"))
+            except Exception as e:
+                results.append((step_num, label, f"FAIL: {e}"))
+
+        # apply_additional_transform
+        try:
+            bpy.ops.mmd_tools.apply_additional_transform()
+            results.append(("8.5", "apply_additional_transform", "OK"))
+        except Exception as e:
+            results.append(("8.5", "apply_additional_transform", f"WARN: {e}"))
 
         total = time.time() - t_start
         self._print_summary(results, total)
