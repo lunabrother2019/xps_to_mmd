@@ -101,6 +101,13 @@ def run_main_pipeline(xps_path, preset_name, report):
     except Exception as e:
         results['2_complete'] = {'status': 'fail', 'error': str(e)}
 
+    # Step 2.5: Clean up control bone weights (全ての親 etc. created by complete_bones)
+    try:
+        bpy.ops.object.xps_transfer_unused_weights()
+        results['2_5_control_weights'] = {'status': 'ok'}
+    except Exception as e:
+        results['2_5_control_weights'] = {'status': 'warn', 'error': str(e)}
+
     # Step 3: Add IK
     try:
         bpy.ops.object.xps_add_mmd_ik()
