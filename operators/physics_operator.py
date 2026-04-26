@@ -55,6 +55,26 @@ PREFIX_JOINT_HAIR = "J.auto_rb_hair_"
 PREFIX_JOINT_BREAST = "J.auto_rb_breast_"
 
 
+D_BONE_ORIGINAL = {
+    '左足D': '左足',   '右足D': '右足',
+    '左ひざD': '左ひざ', '右ひざD': '右ひざ',
+    '左足首D': '左足首', '右足首D': '右足首',
+    '足D.L': '足.L', '足D.R': '足.R',
+    'ひざD.L': 'ひざ.L', 'ひざD.R': 'ひざ.R',
+    '足首D.L': '足首.L', '足首D.R': '足首.R',
+}
+
+TWIST_BONE_FALLBACK = {
+    'ひじ.L': ['手捩.L', '手捩1.L', '手捩2.L', '手捩3.L'],
+    'ひじ.R': ['手捩.R', '手捩1.R', '手捩2.R', '手捩3.R'],
+    '腕.L': ['腕捩.L', '腕捩1.L', '腕捩2.L', '腕捩3.L'],
+    '腕.R': ['腕捩.R', '腕捩1.R', '腕捩2.R', '腕捩3.R'],
+    '足D.L': ['足.L'], '足D.R': ['足.R'],
+    'ひざD.L': ['ひざ.L'], 'ひざD.R': ['ひざ.R'],
+    '左足D': ['左足'], '右足D': ['右足'],
+    '左ひざD': ['左ひざ'], '右ひざD': ['右ひざ'],
+}
+
 HAIR_KEYWORDS = ('hair', '髪', 'kami', 'ponytail', 'fringe', 'bang')
 BREAST_KEYWORDS = ('bust', 'breast', 'boob', 'chest', '胸', '乳', 'oppai', 'pectoral')
 # TODO(generalize): parent 候选列表，不同 rig 可能不同
@@ -155,6 +175,66 @@ def _clear_by_prefix(prefixes):
     return len(to_remove)
 
 
+def _find_mesh_objects(armature_obj):
+    """Return all mesh objects using this armature (via modifier or parenting)."""
+    result = []
+    for obj in bpy.data.objects:
+        if obj.type != 'MESH':
+            continue
+        for mod in obj.modifiers:
+            if mod.type == 'ARMATURE' and mod.object is armature_obj:
+                result.append(obj)
+                break
+        else:
+            if obj.parent is armature_obj:
+                result.append(obj)
+    return result
+
+
+def _compute_capsule_radius(armature_obj, bone_name, mesh_objects,
+                            percentile=0.60, weight_threshold=0.2):
+    """Compute capsule radius from vertex group perpendicular distance to bone axis."""
+    b = armature_obj.data.bones.get(bone_name)
+    if b is None:
+        return None
+    mw = armature_obj.matrix_world
+    head_w = mw @ b.head_local
+    tail_w = mw @ b.tail_local
+    bone_vec = tail_w - head_w
+    bone_len = bone_vec.length
+    if bone_len < 1e-6:
+        return None
+    bone_dir = bone_vec / bone_len
+
+    vg_names = [bone_name]
+    if bone_name in TWIST_BONE_FALLBACK:
+        vg_names.extend(TWIST_BONE_FALLBACK[bone_name])
+
+    radii = []
+    for mesh_obj in mesh_objects:
+        mesh_mw = mesh_obj.matrix_world
+        vg_indices = set()
+        for vg_name in vg_names:
+            vg = mesh_obj.vertex_groups.get(vg_name)
+            if vg is not None:
+                vg_indices.add(vg.index)
+        if not vg_indices:
+            continue
+        for v in mesh_obj.data.vertices:
+            for g in v.groups:
+                if g.group in vg_indices and g.weight >= weight_threshold:
+                    to_v = mesh_mw @ v.co - head_w
+                    perp = to_v - bone_dir * to_v.dot(bone_dir)
+                    radii.append(perp.length)
+                    break
+
+    if not radii:
+        return None
+    radii.sort()
+    idx = min(int(len(radii) * percentile), len(radii) - 1)
+    return radii[idx]
+
+
 def _auto_snap_soft_tissue(armature_obj):
     """Before generating body/breast physics, snap soft-tissue bones (乳奶.L/R)
     to vg center so rigid bodies don't get placed at backbone/offset positions.
@@ -182,34 +262,35 @@ def _auto_snap_soft_tissue(armature_obj):
 # Body main skeleton — static collision capsules
 # ============================================================
 
-# Each entry: (name_j, [preferred_bone_names], shape_type, size_scale, bounded_by_bone_len)
-# size_scale for capsule = radius_ratio relative to bone length
+# Each entry: (name_j, [preferred_bone_names], shape_type)
+# Optional 4th element: radius_override (absolute meters) for bones where
+# mesh-based computation fails (head too big, shoulder vg too narrow, etc.)
 BODY_BONE_SPEC = [
     # Spine
-    ('上半身', ['上半身'], SHAPE_CAPSULE, 0.18),
-    ('上半身2', ['上半身2'], SHAPE_CAPSULE, 0.18),
-    ('上半身3', ['上半身3'], SHAPE_CAPSULE, 0.18),
-    ('下半身', ['下半身'], SHAPE_CAPSULE, 0.20),
+    ('上半身', ['上半身'], SHAPE_CAPSULE),
+    ('上半身2', ['上半身2'], SHAPE_CAPSULE),
+    ('上半身3', ['上半身3'], SHAPE_CAPSULE),
+    ('下半身', ['下半身'], SHAPE_CAPSULE),
     # Head / neck
-    ('首', ['首'], SHAPE_CAPSULE, 0.15),
-    ('頭', ['頭'], SHAPE_SPHERE, 1.10),
+    ('首', ['首'], SHAPE_CAPSULE),
+    ('頭', ['頭'], SHAPE_SPHERE),
     # Shoulders
-    ('肩.L', ['左肩', '肩.L'], SHAPE_CAPSULE, 0.12),
-    ('肩.R', ['右肩', '肩.R'], SHAPE_CAPSULE, 0.12),
+    ('肩.L', ['左肩', '肩.L'], SHAPE_CAPSULE),
+    ('肩.R', ['右肩', '肩.R'], SHAPE_CAPSULE),
     # Arms (prefer raw 腕 not 腕捩)
-    ('腕.L', ['左腕', '腕.L'], SHAPE_CAPSULE, 0.12),
-    ('腕.R', ['右腕', '腕.R'], SHAPE_CAPSULE, 0.12),
-    ('ひじ.L', ['左ひじ', 'ひじ.L'], SHAPE_CAPSULE, 0.10),
-    ('ひじ.R', ['右ひじ', 'ひじ.R'], SHAPE_CAPSULE, 0.10),
-    ('手首.L', ['左手首', '手首.L'], SHAPE_CAPSULE, 0.10),
-    ('手首.R', ['右手首', '手首.R'], SHAPE_CAPSULE, 0.10),
+    ('腕.L', ['左腕', '腕.L'], SHAPE_CAPSULE),
+    ('腕.R', ['右腕', '腕.R'], SHAPE_CAPSULE),
+    ('ひじ.L', ['左ひじ', 'ひじ.L'], SHAPE_CAPSULE),
+    ('ひじ.R', ['右ひじ', 'ひじ.R'], SHAPE_CAPSULE),
+    ('手首.L', ['左手首', '手首.L'], SHAPE_CAPSULE),
+    ('手首.R', ['右手首', '手首.R'], SHAPE_CAPSULE),
     # Legs (D-bone preferred over raw 足)
-    ('足.L', ['左足D', '左足', '足.L'], SHAPE_CAPSULE, 0.16),
-    ('足.R', ['右足D', '右足', '足.R'], SHAPE_CAPSULE, 0.16),
-    ('ひざ.L', ['左ひざD', '左ひざ', 'ひざ.L'], SHAPE_CAPSULE, 0.13),
-    ('ひざ.R', ['右ひざD', '右ひざ', 'ひざ.R'], SHAPE_CAPSULE, 0.13),
-    ('足首.L', ['左足首D', '左足首', '足首.L'], SHAPE_CAPSULE, 0.12),
-    ('足首.R', ['右足首D', '右足首', '足首.R'], SHAPE_CAPSULE, 0.12),
+    ('足.L', ['左足D', '左足', '足.L'], SHAPE_CAPSULE),
+    ('足.R', ['右足D', '右足', '足.R'], SHAPE_CAPSULE),
+    ('ひざ.L', ['左ひざD', '左ひざ', 'ひざ.L'], SHAPE_CAPSULE),
+    ('ひざ.R', ['右ひざD', '右ひざ', 'ひざ.R'], SHAPE_CAPSULE),
+    ('足首.L', ['左足首D', '左足首', '足首.L'], SHAPE_CAPSULE),
+    ('足首.R', ['右足首D', '右足首', '足首.R'], SHAPE_CAPSULE),
 ]
 
 
@@ -235,9 +316,14 @@ class OBJECT_OT_generate_body_rigid_bodies(bpy.types.Operator):
         if cleared:
             print(f"[xps_physics body] cleared {cleared} previous objects")
 
+        mesh_objects = _find_mesh_objects(arm)
+
         created = 0
         skipped = []
-        for name_j, candidates, shape, size_k in BODY_BONE_SPEC:
+        for spec in BODY_BONE_SPEC:
+            name_j, candidates, shape = spec[0], spec[1], spec[2]
+            radius_override = spec[3] if len(spec) > 3 else None
+
             bone_name = pick_deform_bone(arm, candidates)
             if bone_name is None:
                 skipped.append(name_j)
@@ -246,17 +332,30 @@ class OBJECT_OT_generate_body_rigid_bodies(bpy.types.Operator):
             if length < 1e-4:
                 skipped.append(f"{name_j}(len=0)")
                 continue
+
+            eff_length = length
+            orig_name = D_BONE_ORIGINAL.get(bone_name)
+            if orig_name and orig_name in arm.data.bones:
+                _, _, orig_len, _ = _bone_world(arm, orig_name)
+                eff_length = orig_len
+
             mid = (head_w + tail_w) * 0.5
             rot = _euler_from_bone(arm, bone_name)
 
-            if shape == SHAPE_CAPSULE:
-                radius = length * size_k
-                size = (radius, length, radius)
-            elif shape == SHAPE_SPHERE:
-                radius = length * size_k
+            if radius_override is not None:
+                radius = radius_override
+            else:
+                vg_r = _compute_capsule_radius(arm, bone_name, mesh_objects)
+                bl_r = eff_length * 0.2
+                if vg_r is not None:
+                    radius = max(vg_r, bl_r)
+                else:
+                    radius = bl_r
+
+            if shape == SHAPE_SPHERE:
                 size = (radius, radius, radius)
             else:
-                size = (length * size_k, length, length * size_k)
+                size = (radius, eff_length, radius)
 
             try:
                 rb = model.createRigidBody(
@@ -277,7 +376,7 @@ class OBJECT_OT_generate_body_rigid_bodies(bpy.types.Operator):
                     bounce=DEFAULT_BOUNCE,
                 )
                 created += 1
-                print(f"[xps_physics body] {name_j} → bone={bone_name} len={length:.3f}")
+                print(f"[xps_physics body] {name_j} → bone={bone_name} len={eff_length:.3f} r={radius:.3f}")
             except Exception as e:
                 print(f"[xps_physics body] {name_j} 失败: {e}")
                 skipped.append(name_j)
