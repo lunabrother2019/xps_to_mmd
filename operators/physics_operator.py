@@ -626,10 +626,31 @@ class OBJECT_OT_generate_breast_physics(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class OBJECT_OT_toggle_rigid_body_visibility(bpy.types.Operator):
+    bl_idname = "object.xps_toggle_rigid_body_visibility"
+    bl_label = "显示/隐藏刚体"
+    bl_description = "切换所有刚体和关节对象的视口可见性"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        targets = [obj for obj in bpy.data.objects
+                   if getattr(obj, 'mmd_type', '') in ('RIGID_BODY', 'JOINT')]
+        if not targets:
+            self.report({'WARNING'}, "未找到刚体/关节对象")
+            return {'CANCELLED'}
+        show = targets[0].hide_viewport
+        for obj in targets:
+            obj.hide_viewport = not show
+        state = "显示" if show else "隐藏"
+        self.report({'INFO'}, f"已{state} {len(targets)} 个刚体/关节")
+        return {'FINISHED'}
+
+
 _CLASSES = (
     OBJECT_OT_generate_body_rigid_bodies,
     OBJECT_OT_generate_hair_physics,
     OBJECT_OT_generate_breast_physics,
+    OBJECT_OT_toggle_rigid_body_visibility,
 )
 
 

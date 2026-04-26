@@ -236,6 +236,8 @@ class OBJECT_PT_skeleton_hierarchy(bpy.types.Panel):
             row.operator("object.xps_generate_hair_physics", text="生成头发物理", icon='STRANDS')
             row = physics_box.row()
             row.operator("object.xps_generate_breast_physics", text="生成胸部物理", icon='META_BALL')
+            row = physics_box.row()
+            row.operator("object.xps_toggle_rigid_body_visibility", text="显示/隐藏刚体", icon='HIDE_OFF')
 
             # XPS Lara 专属修正（按 L1→L3 诊断顺序，按需使用）
             xps_fixes_box = layout.box()
