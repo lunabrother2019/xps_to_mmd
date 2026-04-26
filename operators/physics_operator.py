@@ -638,10 +638,10 @@ class OBJECT_OT_toggle_rigid_body_visibility(bpy.types.Operator):
         if not targets:
             self.report({'WARNING'}, "未找到刚体/关节对象")
             return {'CANCELLED'}
-        show = targets[0].hide_viewport
+        currently_hidden = targets[0].hide_get()
         for obj in targets:
-            obj.hide_viewport = not show
-        state = "显示" if show else "隐藏"
+            obj.hide_set(not currently_hidden)
+        state = "显示" if currently_hidden else "隐藏"
         self.report({'INFO'}, f"已{state} {len(targets)} 个刚体/关节")
         return {'FINISHED'}
 
